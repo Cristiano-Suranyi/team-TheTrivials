@@ -1,0 +1,4 @@
+presidio-analyzer>=2.2.364
+spacy>=3.8.16
+requests
+PyMuPDF
