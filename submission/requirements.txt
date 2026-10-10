@@ -1,4 +1,9 @@
-presidio-analyzer>=2.2.364
-spacy>=3.8.16
-requests
-PyMuPDF
+PyMuPDF>=1.24,<2
+google-genai>=1,<2
+httpx>=0.27,<1
+presidio-analyzer>=2.2,<3
+spacy>=3.7,<3.8; python_version < "3.10"
+spacy>=3.7,<4; python_version >= "3.10"
+fastapi>=0.115,<0.120
+uvicorn>=0.30,<0.40
+python-multipart>=0.0.20,<0.1

@@ -179,3 +179,10 @@ __pypackages__/
 # Pipfile.lock
 # poetry.lock
 # pdm.lock
+# Cache local com fragmentos originais do documento
+/output/llm_cache.json
+
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.tanstack/
+/frontend/.env*
