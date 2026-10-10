@@ -8,7 +8,6 @@ Instalação da biblioteca: python3 -m pip install PyMuPDF
 
 from pathlib import Path
 import re
-import unicodedata
 
 import pymupdf
 
@@ -16,16 +15,16 @@ import pymupdf
 def extrair_texto(caminho_pdf: str) -> str:
     """Extrai o texto de todas as páginas do PDF indicado."""
     with pymupdf.open(caminho_pdf) as documento:
-        return "".join(pagina.get_text() for pagina in documento)
+        paginas = [pagina.get_text(sort=True).rstrip("\n") for pagina in documento]
+        return "\n\n".join(paginas) + "\n" if paginas else ""
 
 
 def limpar_texto(texto: str) -> str:
-    """Remove acentos, pontuação e espaços repetidos, como no guião."""
-    texto = unicodedata.normalize("NFD", texto)
-    texto = texto.encode("ascii", "ignore").decode("utf-8")
-    texto = re.sub(r"[^a-zA-Z0-9\s]", "", texto)
-    texto = re.sub(r"\s+", " ", texto)
-    return texto.strip()
+    """Remove linhas vazias e espaços finais, preservando acentos e linhas de texto."""
+    texto = texto.replace("\r\n", "\n").replace("\r", "\n")
+    texto = re.sub(r"[ \t]+$", "", texto, flags=re.MULTILINE)
+    linhas = [linha for linha in texto.splitlines() if linha.strip()]
+    return "\n".join(linhas) + "\n" if linhas else ""
 
 
 def converter_pdf_para_txt(
@@ -36,7 +35,9 @@ def converter_pdf_para_txt(
     """Converte qualquer PDF para TXT e devolve o caminho do TXT criado.
 
     Se caminho_txt não for indicado, guarda junto do PDF com extensão .txt.
-    Usa limpar=False para preservar acentos, pontuação e quebras de linha.
+    Preserva acentos, pontuação e quebras de linha por defeito.
+    Remove linhas vazias e espaços finais por defeito.
+    Usa limpar=False para manter o texto extraído sem limpeza.
     """
     texto = extrair_texto(caminho_pdf)
     if limpar:
