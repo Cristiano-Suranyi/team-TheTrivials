@@ -186,3 +186,7 @@ __pypackages__/
 /frontend/dist/
 /frontend/.tanstack/
 /frontend/.env*
+
+# Browser source is not a Python build library
+!/frontend/src/lib/
+!/frontend/src/lib/**

@@ -55,3 +55,11 @@ The local service composes a new, selectable-text PDF with PyMuPDF, one `*` per 
 Detection uses two Gemini passes, both over text protected by previous stages. Model entities specify `texto`, `linha` (1-based), `ocorrencia` (0-based on that line), `categoria` and `tipo`. Types/categories are validated. Line-scoped matches prevent unrelated repeated values being masked. `stats.gemini` includes both passes. Legacy caches are accepted only for unambiguous locations. Reopened reviews require selecting the original PDF before export.
 
 Detection is fragment-based and contextual in all categories. General, educational and administrative information is preserved; personal identifiers and sensitive facts linked to a person are masked. No blanket clinical-section completion is performed. Discarding a suggestion is a browser-local review edit: it restores visible text and excludes the detection from the changes list; render/export receive the resulting segment as unmasked. No endpoint or request schema change is required. Reopening restores initial suggestions.
+
+## Importação Chrome (sem endpoint Python)
+
+A extensão MV3 `lfnbhbifaakkolphooipdoinpknmacnf` abre `/#hidden-import=<ticket>`. O frontend remove o identificador da barra de endereço, recebe metadados e blocos via `chrome.runtime.sendMessage`, valida tamanho (20 MB), cabeçalho PDF e SHA-256, e reconstrói um `File`. A importação abre apenas a confirmação de categorias. O contrato de criação da sessão e exportação mantém-se.
+
+Mensagens: `hidden-import-meta`, `hidden-import-chunk` (offset alinhado a 192 KiB), `hidden-import-done` (consome o ticket e fecha a página temporária). O ticket expira em dez minutos e está ligado à origem local e aba destinatária. Uma autorização separada permite `hidden-history` com apenas `session_id`, `file_name`, `expires_at`, para as últimas dez revisões. Nenhum conteúdo é armazenado nesse histórico. Pedidos fora da origem/aba, expirados ou reutilizados são rejeitados.
+
+A revisão apresenta sempre texto original; máscaras e escolhas são estado separado. A composição das saídas anonimiza os segmentos selecionados, conservando o mesmo contrato PDF/TXT/relatório.

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AnonymizationWorkspace } from "./anonymization-workspace";
+import * as extension from "@/lib/anonymize/extension-import";
 import * as client from "@/lib/anonymize/client";
 import type { SessionPayload } from "@/lib/anonymize/core";
 
@@ -31,7 +32,8 @@ describe("Review navigation", () => {
     const target = container.querySelector('[data-token-id="4"]');
     expect(target?.getAttribute("data-active")).toBe("true");
     expect(container.querySelector('[data-token-id="2"]')?.getAttribute("data-active")).toBe("false");
-    expect(target?.textContent).toBe("*");
+    expect(target?.textContent).toBe("Ana");
+    expect(target?.getAttribute("aria-pressed")).toBe("true");
     expect(scroll).toHaveBeenCalledWith(expect.objectContaining({top: 610}));
     expect(pageScroll).not.toHaveBeenCalled();
     // Clicking the already selected row must navigate again after manual scrolling.
@@ -44,7 +46,7 @@ describe("Review navigation", () => {
     fireEvent.click(screen.getByRole("button", {name: "Remove suggestion 1"}));
     expect(screen.getAllByRole("button", {name: /^Ana Name/})).toHaveLength(1);
     expect(container.querySelector('[data-token-id="2"]')?.textContent).toBe("Ana");
-    expect(container.querySelector('[data-token-id="4"]')?.textContent).toBe("*");
+    expect(container.querySelector('[data-token-id="4"]')?.textContent).toBe("Ana");
     expect(screen.getByRole("heading", {name: "Changes 1"})).toBeVisible();
     expect(screen.queryByRole("button", {name: "Report"})).toBeNull();
     expect(screen.queryByRole("button", {name: "Review original"})).toBeNull();
@@ -61,7 +63,7 @@ describe("Review navigation", () => {
     fireEvent.mouseUp(element);
     fireEvent.click(screen.getByRole("button",{name:/^Hide$/}));
     expect(screen.getByRole("button",{name:/^Ana Manual/})).toBeVisible();
-    expect(container.querySelector('[data-token-id="100000"]')?.textContent).toBe("*");
+    expect(container.querySelector('[data-token-id="100000"]')?.textContent).toBe("Ana");
     selection.removeAllRanges();
   });
   it("navigates after switching documents that reuse token IDs", async () => {
@@ -76,16 +78,27 @@ describe("Review navigation", () => {
     await waitFor(() => expect(screen.getByRole("button", {name:"Download PDF"})).toBeVisible());
     fireEvent.click(screen.getByRole("button", {name:"b.pdf"}));
     fireEvent.click(screen.getByRole("button", {name:/^Bruno Name/}));
-    expect(container.querySelector('[data-token-id="2"]')?.textContent).toBe("*");
+    expect(container.querySelector('[data-token-id="2"]')?.textContent).toBe("Bruno");
     expect(container.querySelector('[data-token-id="2"]')?.getAttribute("data-active")).toBe("true");
     expect(scroll).toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button",{name:"Remove suggestion 1"}));
     expect(container.querySelector('[data-token-id="2"]')?.textContent).toBe("Bruno");
     fireEvent.click(screen.getByRole("button",{name:"a.pdf"}));
-    expect(container.querySelector('[data-token-id="2"]')?.textContent).toBe("*");
+    expect(container.querySelector('[data-token-id="2"]')?.textContent).toBe("Ana");
     fireEvent.click(screen.getByRole("button",{name:"b.pdf"}));
     expect(container.querySelector('[data-token-id="2"]')?.textContent).toBe("Bruno");
     expect(screen.queryByRole("button",{name:/^Bruno Name/})).toBeNull();
   });
 
+});
+
+it("loads extension PDF at confirmation without starting detection", async () => {
+  window.history.replaceState(null, "", "/#hidden-import=" + "a".repeat(64));
+  vi.spyOn(extension, "importExtensionPdf").mockResolvedValue({file: new File(["%PDF-"], "extension.pdf", {type: "application/pdf"}), historyTicket: "b".repeat(64)});
+  const create = vi.spyOn(client, "createSession");
+  render(<AnonymizationWorkspace />);
+  await waitFor(() => expect(screen.getByRole("button", {name: "Anonymize document"})).toBeVisible());
+  expect(screen.getByText("extension.pdf")).toBeVisible();
+  expect(create).not.toHaveBeenCalled();
+  expect(window.location.hash).toBe("");
 });

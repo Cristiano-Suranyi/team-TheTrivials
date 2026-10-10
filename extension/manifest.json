@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "minimum_chrome_version": "127",
+  "name": "Hidden \u2014 Anonymize PDFs",
+  "version": "1.1.0",
+  "description": "Open a PDF in Hidden to review sensitive data before exporting an anonymized PDF.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx0Cmhj88p5oNc6lyMAPvUhz6h/oS9GbvlsrpXr0mKGfjIKvFCFzdacYZVxxWhcp5P8geQhtcwpJ4iA/7vrjxD4khF2Lob7S/TjKhRRb2SFjQf/XuYJbsR7lvts21yyPJ9oFg2I0bc6qHsoSIFLoej7Yz0fpz3qfJMqn9G1oIUWMMUP/zKSDW/dPxXZeZznHq3MJhmQRuiCv0epxlhnC0BwhwltD4WchoKAciklCmumdofR2k5E5unLeVmdNBtFm4KWGKCt8Yxd9hLUpU9mAIPO3qZAfah7kFCSpmJVdA1QbRxxdhYlFrx5IMJvPDw+aMpsZN8VTUdFuVYzPcWoq71wIDAQAB",
+  "permissions": [
+    "storage",
+    "tabs",
+    "webRequest",
+    "webNavigation",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*",
+    "file:///*"
+  ],
+  "externally_connectable": {
+    "matches": [
+      "http://127.0.0.1/*",
+      "http://localhost/*"
+    ]
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

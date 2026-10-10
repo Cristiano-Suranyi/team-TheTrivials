@@ -28,6 +28,8 @@ import { cn } from "@/lib/utils";
 import { createSession, deleteSession, exportPdf, pdfFingerprint, extractPdfLines } from "@/lib/anonymize/client";
 import { allCategories, maskText, type Category, type SessionPayload, type Token as ApiToken } from "@/lib/anonymize/core";
 
+import { importExtensionPdf, rememberExtensionReview } from "@/lib/anonymize/extension-import";
+
 type Phase = "upload" | "confirm" | "processing" | "review";
 type Token = ApiToken & { masked?: boolean };
 const processingSteps = ["Read PDF", "Presidio", "Gemini", "Review"];
@@ -114,6 +116,10 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
   const documentTokenRefs = useRef(new Map<number, HTMLButtonElement>());
   const sidebarTokenRefs = useRef(new Map<number, HTMLButtonElement>());
 
+  const importPromise = useRef<ReturnType<typeof importExtensionPdf> | null>(null);
+  const historyTicket = useRef("");
+  const [importing, setImporting] = useState(false);
+
   const chooseFiles = (list?: FileList | File[] | null) => {
     const incoming = Array.from(list ?? []);
     if (incoming.length === 0) return;
@@ -141,6 +147,25 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
     setFiles((current) => [...current, ...accepted]);
     setPhase("confirm");
   };
+
+  useEffect(() => {
+    if (initialSession) return;
+    const ticket = new URLSearchParams(window.location.hash.slice(1)).get("hidden-import");
+    if (!ticket && !importPromise.current) return;
+    if (!importPromise.current) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      importPromise.current = importExtensionPdf(ticket!);
+    }
+    let cancelled = false;
+    setImporting(true);
+    importPromise.current.then(result => {
+      if (cancelled) return;
+      historyTicket.current = result.historyTicket;
+      chooseFiles([result.file]);
+    }).catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : "Não foi possível importar o PDF."); })
+      .finally(() => { if (!cancelled) setImporting(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const removeFile = (id: number) => {
     const next = files.filter((f) => f.id !== id);
@@ -193,6 +218,7 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
           setProgress(base + share * (0.1 + current.progress * 0.009));
           setStatusText(stageLabels[current.stage] ?? current.stage);
         }, fingerprint);
+        if (historyTicket.current) void rememberExtensionReview(historyTicket.current, session).catch(() => {});
         setProgress(base + share);
         states.set(f.id, initialStateFor(session.lines as Token[][], settings.categories));
         updated.push({ ...f, sessionId: session.session_id, stats: session.stats });
@@ -541,6 +567,7 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
             if (original) void download(original);
           }}
         />
+        {importing && <p role="status" className="mb-4 text-sm text-muted-foreground">A importar o PDF da extensão…</p>}
         {phase === "upload" && (
           <main className="workspace-enter mx-auto flex max-w-5xl flex-col px-5 pb-12 pt-12 sm:px-8 sm:pt-16">
             <section className="mx-auto w-full max-w-3xl text-center">
@@ -787,7 +814,7 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
             </section>
 
             <div className="mb-4 flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Anonymized review · PDF export with compact text and new pagination</span>
+              <span className="text-xs text-muted-foreground">Os fragmentos destacados serão ocultados no download · PDF com nova paginação</span>
             </div>
             <section className="grid gap-6 md:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_320px]">
               <DocumentPanel size={fileSize}>
@@ -988,7 +1015,7 @@ function DocumentLines({
                 data-active={activeTokenId === token.id}
                 aria-pressed={selected}
               >
-                {selected ? maskText(token.text) : token.text}
+                {token.text}
               </Button>
             );
           })}

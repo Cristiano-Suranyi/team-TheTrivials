@@ -21,7 +21,7 @@ A chave continua no ficheiro local `submission/.env`: `GEMINI_API_KEY=...`, igno
 1. Escolher um ou vários PDFs com texto selecionável, até 20 MB cada.
 2. Confirmar categorias e iniciar a anonimização.
 3. O navegador extrai as linhas. Presidio mascara os dados simples localmente. Gemini recebe esse texto protegido e procura dados sensíveis pelo contexto. As posições são reconstruídas sobre o original.
-4. Clicar nos fragmentos para manter/ocultar, ou selecionar texto para o ocultar manualmente. A pré-visualização mostra o TXT final.
+4. Clicar nos fragmentos para manter/ocultar, ou selecionar texto para o ocultar manualmente. A revisão mantém as palavras originais; os fragmentos com fundo serão ocultados no download. Os asteriscos aparecem apenas no PDF/TXT de saída.
 5. Descarregar o PDF com «Download PDF». O original só é enviado ao serviço Python local no momento da exportação. O TXT anonimizado e o relatório ficam numa pasta exclusiva em `output/`. O relatório mantém-se apenas na pasta de saída; não existe botão de relatório na interface.
 
 A interface mostra contagens reais de cada etapa. O resultado só é disponibilizado quando ambas terminam e a resposta do modelo é validada. O TXT mantém espaços e quebras de linha, elimina linhas vazias e usa um `*` por palavra ocultada. A exportação compõe um PDF novo, com texto compacto em páginas A4, margens de 40 pontos, fonte de 11 pontos e paginação automática. O desenho e o número de páginas do original podem mudar. O original nunca é incorporado no resultado. A CLI mantém a extração com PyMuPDF; a interface usa PDF.js durante a deteção; apenas na exportação o original chega ao serviço local. A CLI guarda o TXT em `output/anonimizado.txt`.
@@ -50,3 +50,7 @@ Clicar na lista direita centra o fragmento exato na vista anonimizada única. Ca
 Uma revisão reaberta pede o mesmo PDF original para exportar. PDFs sem texto, protegidos ou cujo texto não se consiga reconciliar com a revisão são rejeitados com um erro claro. O PDF novo não incorpora imagens, campos interativos, anotações, anexos ou assinaturas do original. A deteção cobre texto, não identidades em fotografias. Cada exportação cria uma nova pasta em `output/`, sem substituir anteriores.
 
 A deteção decide por fragmento e contexto em todas as categorias: informação geral, educativa e administrativa permanece; identificadores e factos sensíveis atribuídos a uma pessoa são sugeridos para ocultação. Não há cobertura automática de secções clínicas inteiras. Ambas as passagens Gemini recebem texto protegido. Os filtros corrigem falsos positivos contextuais sem reenviar valores já protegidos.
+
+## Extensão Chrome
+
+A pasta `extension/` contém a extensão integrada, com ícones e estilo fornecidos. Consulta `extension/README.md` para carregar no Chrome 127+, fixar o ícone e autorizar PDFs locais. Abrir um PDF e clicar em «Abrir no Hidden» entrega-o ao site sem nova seleção e aguarda a confirmação das categorias. A transferência permanece no navegador; o popup não inicia análise. O aviso automático pode ser desligado e o histórico conserva apenas metadados das últimas dez revisões.
