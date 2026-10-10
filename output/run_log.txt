@@ -1,0 +1,7 @@
+=== dom 11 out 2026 00:42:43 WEST ===
+Tentativa 1/3 (temperature 0.0)
+Texto do modelo rejeitado (1 erros); uso a máscara feita a partir das entidades.
+  linhas: enviadas 60, devolvidas 58
+OK: 43 entidades (tentativa 1); texto do modelo rejeitado.
+submission.txt, prompt.txt e entidades.json atualizados.
+EXIT=0

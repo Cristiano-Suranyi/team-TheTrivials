@@ -46,3 +46,20 @@ python3 -m unittest discover -s tests -v
 ```
 
 Usa o Python do venv para o teste de leitura de PDF, caso o PyMuPDF não esteja instalado no Python do sistema.
+
+## Pipeline de uma só chamada (`anonymize.py`)
+
+Alternativa ao `main.py` que gera os ficheiros de submissão diretamente a partir do modelo:
+
+```bash
+python3 submission/anonymize.py              # PDF -> Presidio -> Gemini -> validação
+python3 submission/anonymize.py --so-prompt  # só gera o prompt, sem chamar a API
+```
+
+1. O PDF é convertido em texto, sem linhas vazias.
+2. O Presidio mascara os dados simples (um `*` por palavra).
+3. Uma única chamada ao Gemini, com `prompt_template.txt` e saída JSON estruturada a `temperature=0`, devolve primeiro a lista `entidades` (com categoria e motivo) e depois `texto_anonimizado`.
+4. As `entidades` são aplicadas em código, com um `*` por palavra, alinhadas com o início e o fim de cada palavra e mesmo quando um valor continua na linha seguinte. O `texto_anonimizado` do modelo é validado palavra a palavra (mesmo número de linhas e de palavras; cada palavra fica intacta ou passa a `*`, mantendo a pontuação exterior). Se for válido, as duas máscaras são unidas; se não for, usa-se a máscara feita a partir das entidades. A chamada só se repete (até 3 vezes) quando a resposta não é JSON válido.
+5. `submission.txt` recebe o documento final, `prompt.txt` o prompt exato enviado e `output/entidades.json` as entidades, as que não foram encontradas no texto e os erros do texto do modelo, para revisão.
+
+O template usa o marcador `{DOCUMENTO}` e é preenchido com `str.replace()`, porque os exemplos contêm chavetas.
