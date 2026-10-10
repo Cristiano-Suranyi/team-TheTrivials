@@ -7,28 +7,28 @@ Data de Nascimento: *
 Sexo: *
 NIF: *
 Cartão de Cidadão: *
-Morada: * * * * * * * *
+Morada: * * *, *, * *, *, *
 Telefone: * * * *
 Email: *
 Número da Segurança Social: *
 Histórico Médico:
-A paciente * *, mulher * de * *, compareceu à consulta relatando *
+A paciente * *, * * de * *, compareceu à consulta relatando *
 * *. Tem histórico de * e * * *, diagnosticada há 5 anos. É
-* * desde 2018, atualmente com carga viral indetectável graças ao tratamento com
+* * desde 2018, atualmente com * * * graças ao tratamento com
 *.
-A paciente relatou que sua família tem histórico de * * * (mãe falecida aos 52 anos)
+A paciente relatou que sua família tem histórico de * * * (* * * * *)
 e * * (pai e avô paterno). Exames genéticos realizados em 2022 indicaram
-predisposição ao cancro de mama (* * *).
+* * * * * (* * *).
 Informações Sociais e Comportamentais:
 Estado civil: *
-Filhos: 2 (*, * * e *, * *)
+Filhos: * (*, * * e *, * *)
 Religião: * *
 Ocupação: * * na Faculdade de Direito de Lisboa
-Hábitos: * (parou há 3 anos), * * * (2-3 doses por semana)
+Hábitos: * (parou há 3 anos), * * * (* * * *)
 Histórico de uso de substâncias: * * * * * em 2019
 Informações Financeiras:
 Seguro de saúde: Plano Premium Saúde Total, apólice nº *
-Número do cartão de crédito: * * * * (validade 09/27, CVV *)
+Número do cartão de crédito: * * * * (validade *, CVV *)
 Rendimento anual declarado: *
 Dados Biométricos:
 Impressão digital registrada no sistema: *
@@ -39,22 +39,22 @@ Tipo sanguíneo: *
 Pressão arterial na admissão: * *
 Notas da Consulta:
 A paciente apresentou-se * durante a consulta, relatando * * *
-relativamente à elevada carga de responsabilidades que adquiriu. Sensação de * *
-* * * foram ditos fazer parte do seu dia-a-dia, no entanto, apresenta * *
-* as horas indicadas de sono.
+relativamente à * * * * que adquiriu. * * *, *,
+e * * foram ditos fazer parte do seu dia-a-dia, no entanto, apresenta * *
+* * * * * *.
 Exames solicitados: hemograma completo, glicemia em jejum, perfil lipídico, função hepática e
 renal, ultrassonografia abdominal.
-Prescrição: * * *, * 50mg 1x/dia, * * (apenas em
-caso de crises de ansiedade).
+Prescrição: * * *, * * *, * * (apenas em
+caso de * * *).
 Contatos de Emergência:
-Nome: * * (*)
+Nome: * * (irmão)
 Telefone: *
 Email: *
-Nome: * * (* *)
+Nome: * * (amiga próxima)
 Telefone: *
 Assinatura Digital:
 * * *
 CRM: *
-Especialidade: * *
+Especialidade: Medicina Interna
 Email: *
 Telefone: *

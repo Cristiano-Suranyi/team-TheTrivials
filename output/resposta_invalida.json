@@ -1,0 +1,205 @@
+{
+  "erros": [
+    "linhas: enviadas 60, devolvidas 58"
+  ],
+  "resposta": {
+    "entidades": [
+      {
+        "texto": "12/03/1978",
+        "categoria": "IDENTIFICACAO",
+        "motivo": "data de nascimento"
+      },
+      {
+        "texto": "Feminino",
+        "categoria": "IDENTIFICACAO",
+        "motivo": "sexo da paciente"
+      },
+      {
+        "texto": "Rua das Flores, 123, Apt 45, Sacavém, Lisboa",
+        "categoria": "CONTACTO",
+        "motivo": "morada completa"
+      },
+      {
+        "texto": "mulher",
+        "categoria": "IDENTIFICACAO",
+        "motivo": "sexo da paciente"
+      },
+      {
+        "texto": "caucasiana",
+        "categoria": "IDENTIFICACAO",
+        "motivo": "origem étnica"
+      },
+      {
+        "texto": "47 anos",
+        "categoria": "IDENTIFICACAO",
+        "motivo": "idade da paciente"
+      },
+      {
+        "texto": "dores abdominais intensas",
+        "categoria": "SAUDE",
+        "motivo": "sintomas"
+      },
+      {
+        "texto": "hipertensão",
+        "categoria": "SAUDE",
+        "motivo": "diagnóstico"
+      },
+      {
+        "texto": "diabetes tipo 2",
+        "categoria": "SAUDE",
+        "motivo": "diagnóstico"
+      },
+      {
+        "texto": "HIV positivo",
+        "categoria": "SAUDE",
+        "motivo": "diagnóstico"
+      },
+      {
+        "texto": "carga viral indetectável",
+        "categoria": "SAUDE",
+        "motivo": "estado de saúde"
+      },
+      {
+        "texto": "antirretrovirais",
+        "categoria": "SAUDE",
+        "motivo": "medicação"
+      },
+      {
+        "texto": "cancro da mama",
+        "categoria": "SAUDE",
+        "motivo": "antecedentes familiares de doença"
+      },
+      {
+        "texto": "mãe falecida aos 52 anos",
+        "categoria": "SAUDE",
+        "motivo": "antecedentes familiares"
+      },
+      {
+        "texto": "doença cardíaca",
+        "categoria": "SAUDE",
+        "motivo": "antecedentes familiares de doença"
+      },
+      {
+        "texto": "pai e avô paterno",
+        "categoria": "SAUDE",
+        "motivo": "antecedentes familiares"
+      },
+      {
+        "texto": "predisposição ao cancro de mama",
+        "categoria": "SAUDE",
+        "motivo": "resultado genético"
+      },
+      {
+        "texto": "mutação BRCA1 positiva",
+        "categoria": "GENETICO",
+        "motivo": "resultado genético"
+      },
+      {
+        "texto": "João",
+        "categoria": "IDENTIFICACAO",
+        "motivo": "nome de familiar"
+      },
+      {
+        "texto": "15 anos",
+        "categoria": "IDENTIFICACAO",
+        "motivo": "idade de familiar"
+      },
+      {
+        "texto": "12 anos",
+        "categoria": "IDENTIFICACAO",
+        "motivo": "idade de familiar"
+      },
+      {
+        "texto": "Católica praticante",
+        "categoria": "RELIGIAO",
+        "motivo": "crença religiosa"
+      },
+      {
+        "texto": "universitária",
+        "categoria": "IDENTIFICACAO",
+        "motivo": "profissão"
+      },
+      {
+        "texto": "Ex-fumante",
+        "categoria": "SAUDE",
+        "motivo": "hábito"
+      },
+      {
+        "texto": "parou há 3 anos",
+        "categoria": "SAUDE",
+        "motivo": "hábito"
+      },
+      {
+        "texto": "consome álcool socialmente (2-3 doses por semana)",
+        "categoria": "SAUDE",
+        "motivo": "hábito"
+      },
+      {
+        "texto": "Tratamento para dependência de ansiolíticos",
+        "categoria": "SAUDE",
+        "motivo": "histórico de saúde"
+      },
+      {
+        "texto": "€62.500",
+        "categoria": "FINANCEIRO",
+        "motivo": "rendimento anual"
+      },
+      {
+        "texto": "1,68m",
+        "categoria": "SAUDE",
+        "motivo": "medida antropométrica"
+      },
+      {
+        "texto": "72kg",
+        "categoria": "SAUDE",
+        "motivo": "medida antropométrica"
+      },
+      {
+        "texto": "O+",
+        "categoria": "SAUDE",
+        "motivo": "tipo sanguíneo"
+      },
+      {
+        "texto": "145/90 mmHg",
+        "categoria": "SAUDE",
+        "motivo": "pressão arterial"
+      },
+      {
+        "texto": "ansiosa",
+        "categoria": "SAUDE",
+        "motivo": "estado emocional"
+      },
+      {
+        "texto": "problemas no trabalho",
+        "categoria": "OUTRO_SENSIVEL",
+        "motivo": "problema pessoal"
+      },
+      {
+        "texto": "cansaço, fadiga, e constante stress",
+        "categoria": "SAUDE",
+        "motivo": "sintomas"
+      },
+      {
+        "texto": "dificuldade em dormir/cumprir as horas indicadas de sono",
+        "categoria": "SAUDE",
+        "motivo": "sintomas"
+      },
+      {
+        "texto": "Metformina 850mg 2x/dia",
+        "categoria": "SAUDE",
+        "motivo": "medicação e dose"
+      },
+      {
+        "texto": "Alprazolam 0,5mg",
+        "categoria": "SAUDE",
+        "motivo": "medicação e dose"
+      },
+      {
+        "texto": "12345-PT",
+        "categoria": "IDENTIFICACAO",
+        "motivo": "identificador profissional"
+      }
+    ],
+    "texto_anonimizado": "Relatório de Admissão - Centro Médico Lisboa\nData: 15 de abril de 2025\nReferência: ADM-2025-04-15-089\nInformações do Paciente:\nNome: * * * *\nData de Nascimento: *\nSexo: *\nNIF: *\nCartão de Cidadão: *\nMorada: *, *, *, *, *, *\nTelefone: * * * *\nEmail: *\nNúmero da Segurança Social: *\nHistórico Médico:\nA paciente * *, * * de *, compareceu à consulta relatando *\n* *. Tem histórico de * e *, diagnosticada há 5 anos. É\n* * desde 2018, atualmente com * * * graças ao tratamento com\n*.\nA paciente relatou que sua família tem histórico de * * * (* * * * * *)\ne * * (* * * * *). Exames genéticos realizados em 2022 indicaram\n* * * * (* * * *).\nInformações Sociais e Comportamentais:\nEstado civil: *\nFilhos: 2 (*, * * e *, * *)\nReligião: *\nOcupação: * universitária na Faculdade de Direito de Lisboa\nHábitos: * (* * * *), * * * (*-* * * *)\nHistórico de uso de substâncias: * * * * * * * em 2019\nInformações Financeiras:\nSeguro de saúde: Plano Premium Saúde Total, apólice nº *\nNúmero do cartão de crédito: * * * * (validade *, CVV *)\nRendimento anual declarado: *\nDados Biométricos:\nImpressão digital registrada no sistema: *\nReconhecimento facial: *\nAltura: *\nPeso: *\nTipo sanguíneo: *\nPressão arterial na admissão: *\nNotas da Consulta:\nA paciente apresentou-se * durante a consulta, relatando * * *\nrelativamente à elevada carga de responsabilidades que adquiriu. Sensação de *, *, e * * * foram ditos fazer parte do seu dia-a-dia, no entanto, apresenta * * * * * * * * * * * * * * *.\nExames solicitados: hemograma completo, glicemia em jejum, perfil lipídico, função hepática e\nrenal, ultrassonografia abdominal.\nPrescrição: *, * 50mg 1x/dia, * * (apenas em\ncaso de crises de ansiedade).\nContatos de Emergência:\nNome: * * (irmão)\nTelefone: *\nEmail: *\nNome: * * (amiga próxima)\nTelefone: *\nAssinatura Digital:\n* * *\nCRM: *\nEspecialidade: Medicina Interna\nEmail: *\nTelefone: *"
+  }
+}
