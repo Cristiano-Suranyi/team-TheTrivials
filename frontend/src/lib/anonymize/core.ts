@@ -13,6 +13,7 @@ export type SessionPayload = {
   stage: string;
   progress: number;
   error?: string;
+  submission_error?: string | null;
   stats?: { presidio: number; gemini: number; total: number; coverage?: number };
 };
 export type RenderSegment = { text: string; masked: boolean };

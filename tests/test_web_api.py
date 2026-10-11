@@ -75,7 +75,11 @@ class WebTests(unittest.TestCase):
         with patch.object(delivery, 'gerar_entrega', side_effect=ValueError('invalid response')), \
              patch.object(delivery, 'guardar_entrega') as save:
             sid = self.create()
-            self.assertEqual(self.ready(sid)['status'], 'failed')
+            session = self.ready(sid)
+            self.assertEqual(session['status'], 'ready')
+            self.assertIn('submission.txt', session['submission_error'])
+            self.assertTrue(session['lines'])
+            self.assertEqual(self.client.get(f'/api/public/sessions/{sid}/masked').status_code, 200)
             save.assert_not_called()
 
     def test_cancel_during_submission_cannot_publish_delivery(self):

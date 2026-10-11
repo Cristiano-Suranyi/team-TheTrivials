@@ -65,7 +65,7 @@ const categoryLabels: Record<Category, { label: string; hint: string }> = {
 };
 
 type AnonymizationSettings = { categories: Category[] };
-type QueuedFile = { id: number; name: string; size: string; file?: File; sessionId?: string; stats?: SessionPayload["stats"] };
+type QueuedFile = { id: number; name: string; size: string; file?: File; sessionId?: string; stats?: SessionPayload["stats"]; submissionError?: string | null };
 type DocState = { maskedIds: Set<number>; manualIds: Set<number>; docLines: Token[][]; activeTokenId: number };
 
 function initialStateFor(docLines: Token[][], categories: Category[]): DocState {
@@ -78,7 +78,7 @@ function initialStateFor(docLines: Token[][], categories: Category[]): DocState 
 
 export function AnonymizationWorkspace({ initialSession }: { initialSession?: SessionPayload } = {}) {
   const sessionFile: QueuedFile | null = initialSession
-    ? { id: 1, name: initialSession.file_name, size: "", sessionId: initialSession.session_id, stats: initialSession.stats }
+    ? { id: 1, name: initialSession.file_name, size: "", sessionId: initialSession.session_id, stats: initialSession.stats, submissionError: initialSession.submission_error ?? null }
     : null;
   const sessionState = initialSession
     ? initialStateFor(initialSession.lines as Token[][], initialSession.categories as Category[])
@@ -221,7 +221,7 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
         if (historyTicket.current) void rememberExtensionReview(historyTicket.current, session).catch(() => {});
         setProgress(base + share);
         states.set(f.id, initialStateFor(session.lines as Token[][], settings.categories));
-        updated.push({ ...f, sessionId: session.session_id, stats: session.stats });
+        updated.push({ ...f, sessionId: session.session_id, stats: session.stats, submissionError: session.submission_error ?? null });
       }
     } catch (err) {
       for (const complete of updated) if (complete.sessionId) void deleteSession(complete.sessionId).catch(() => {});
@@ -642,13 +642,6 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
                   </li>
                 ))}
               </ul>
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="flex w-full items-center justify-center gap-2 border-t border-border px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-secondary"
-              >
-                <Upload className="size-4" /> Add more
-              </button>
             </div>
             {error && (
               <p role="alert" className="mt-3 flex items-center justify-center gap-2 text-sm text-destructive">
@@ -821,6 +814,11 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">Os fragmentos destacados serão ocultados no download · PDF com nova paginação</span>
             </div>
+            {activeFile?.submissionError && (
+              <p role="status" className="mb-4 rounded-md border border-border bg-secondary px-4 py-3 text-sm">
+                {activeFile.submissionError}
+              </p>
+            )}
             <section className="grid gap-6 md:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_320px]">
               <DocumentPanel size={fileSize}>
                 <div ref={documentAreaRef} className="relative" onMouseUp={handleDocumentMouseUp}>

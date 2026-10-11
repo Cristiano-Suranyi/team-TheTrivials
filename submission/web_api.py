@@ -206,15 +206,24 @@ class SessionService:
                     on_progress=lambda stage, progress: self.update(sid, stage=stage, progress=progress),
                 )
             self.update(sid, stage='Generating the submission text', progress=97)
-            texto, prompt = submission_delivery.gerar_entrega(
-                doc.text, self.analyzer, engine.carregar_chave(), self.model,
-                texto_protegido=result['texto_protegido'])
+            submission_error = None
+            try:
+                texto, prompt = submission_delivery.gerar_entrega(
+                    doc.text, self.analyzer, engine.carregar_chave(), self.model,
+                    texto_protegido=result['texto_protegido'])
+                with self.lock:
+                    self.get(sid)
+                    submission_delivery.guardar_entrega(texto, prompt)
+            except Exception:
+                # Submission failure must not discard a successfully validated review.
+                # Never expose model text, credentials or third-party exception messages.
+                submission_error = ('A revisão está disponível, mas não foi possível atualizar '
+                                    'submission.txt e prompt.txt. A entrega anterior foi conservada.')
             lines = tokenize(doc)
             with self.lock:
-                # Deleting/expiring a session during Gemini must not publish its delivery.
                 self.get(sid)
-                submission_delivery.guardar_entrega(texto, prompt)
                 self.update(sid, doc=doc, lines=lines, stats=result['stats'], context=result['context'],
+                            submission_error=submission_error,
                             status='ready', stage='Ready for your review', progress=100)
         except Exception as error:
             # Never include third-party exceptions, document text or credentials in HTTP responses/logs.

@@ -6,7 +6,7 @@ O `main.py` reúne a extração do PDF, deteção e máscara local com Presidio,
 
 Executa `python3 run_app.py` na raiz do projeto e abre http://127.0.0.1:8787. No Windows usa `py run_app.py`. Instruções completas em [APP.md](../APP.md). Se o Hidden já estiver ativo, o comando mostra o endereço e termina sem criar outro servidor. Se a porta estiver ocupada por outro serviço, usa `python3 run_app.py --port 8788` ou encerra esse serviço.
 
-Cada análise concluída no site gera também uma entrega TXT através do `prompt_template.txt` existente, numa chamada Gemini adicional com as deteções locais previamente protegidas. `submission/submission.txt` recebe exclusivamente o campo `texto_anonimizado` devolvido pelo modelo e `submission/prompt.txt` recebe o prompt exato dessa chamada. O último documento concluído substitui estes dois ficheiros; falhas da API, respostas com formatação inválida e sessões canceladas não os atualizam. A entrega web valida linhas e palavras antes de gravar; repete até três vezes com o mesmo prompt, sem reparar localmente a resposta do modelo. Alterações manuais da revisão e o PDF descarregado não alteram esta resposta do modelo. Para entregar ao hackathon, analisa por último `raw_data/document_to_anonymize.pdf`, confirma os ficheiros e inclui-os no commit.
+Cada análise concluída no site gera também uma entrega TXT através do `prompt_template.txt` existente, numa chamada Gemini adicional com as deteções locais previamente protegidas. `submission/submission.txt` recebe exclusivamente o campo `texto_anonimizado` devolvido pelo modelo e `submission/prompt.txt` recebe o prompt exato dessa chamada. O último documento concluído substitui estes dois ficheiros; falhas da API, JSON inválido e sessões canceladas não os atualizam. A entrega web verifica linhas e palavras como diagnóstico, mas guarda o texto original do modelo mesmo se houver divergências de formatação, sem o reparar localmente. Alterações manuais da revisão e o PDF descarregado não alteram esta resposta do modelo. Para entregar ao hackathon, analisa por último `raw_data/document_to_anonymize.pdf`, confirma os ficheiros e inclui-os no commit.
 
 ## Executar
 
@@ -65,3 +65,5 @@ python3 submission/anonymize.py --so-prompt  # só gera o prompt, sem chamar a A
 5. `submission.txt` recebe exatamente o campo `texto_anonimizado` do modelo (a união local é apenas diagnóstico), `prompt.txt` o prompt exato enviado e `output/entidades.json` as entidades, as que não foram encontradas no texto e os erros do texto do modelo, para revisão.
 
 O template usa o marcador `{DOCUMENTO}` e é preenchido com `str.replace()`, porque os exemplos contêm chavetas.
+
+Uma falha na geração/gravação da entrega não bloqueia a revisão validada nem o download PDF. A sessão continua `ready`, com `submission_error` (mensagem segura) quando a entrega não foi atualizada; a interface apresenta esse aviso por documento.

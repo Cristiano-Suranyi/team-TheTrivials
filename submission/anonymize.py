@@ -301,7 +301,7 @@ def gerar_entrega(texto: str, analyzer, api_key: str, model: str,
         texto_protegido = protegido.text
     prompt = renderizar_prompt(texto_protegido)
     resposta = anonimizar(prompt, texto_protegido, api_key, model, 3,
-                         exigir_formatacao=True)
+                         exigir_formatacao=False)
     return resposta["texto_modelo"], prompt
 
 

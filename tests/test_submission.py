@@ -65,6 +65,20 @@ class SubmissionTests(unittest.TestCase):
         self.assertEqual(answer, 'Nome: * *')
         self.assertNotIn('Ana Correia', api.call_args.args[0].split('<documento>')[-1])
 
+    def test_web_delivery_saves_model_output_even_when_lines_differ(self):
+        answer = 'Nome: * * Saldo: * *'
+        with patch.object(app, 'chamar_gemini', return_value={'entidades': [], 'texto_anonimizado': answer}) as api:
+            text, prompt = app.gerar_entrega('Nome: Ana Correia\nSaldo: 50 €', object(), 'fake', 'model',
+                                            texto_protegido='Nome: * *\nSaldo: 50 €')
+        self.assertEqual(text, answer)
+        self.assertEqual(prompt, api.call_args.args[0])
+        self.assertEqual(api.call_count, 1)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app.guardar_entrega(text, prompt, root)
+            self.assertEqual((root / 'submission.txt').read_bytes(), answer.encode('utf-8'))
+            self.assertEqual((root / 'prompt.txt').read_bytes(), prompt.encode('utf-8'))
+
     def test_main_saves_model_text_exactly_even_when_local_union_differs(self):
         sent='Nome: * *\nDiagnóstico: diabetes\n'
         answer='Nome: * *\nDiagnóstico: diabetes'
