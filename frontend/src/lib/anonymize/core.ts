@@ -6,6 +6,7 @@ export type SessionPayload = {
   session_id: string;
   file_name: string;
   categories: Category[];
+  context?: { tema: string; preservar: { linha: number; tipos: string[] }[] };
   lines: Token[][];
   expires_at: string;
   status: "queued" | "processing" | "ready" | "failed";

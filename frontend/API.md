@@ -63,3 +63,13 @@ A extensão MV3 `lfnbhbifaakkolphooipdoinpknmacnf` abre `/#hidden-import=<ticket
 Mensagens: `hidden-import-meta`, `hidden-import-chunk` (offset alinhado a 192 KiB), `hidden-import-done` (consome o ticket e fecha a página temporária). O ticket expira em dez minutos e está ligado à origem local e aba destinatária. Uma autorização separada permite `hidden-history` com apenas `session_id`, `file_name`, `expires_at`, para as últimas dez revisões. Nenhum conteúdo é armazenado nesse histórico. Pedidos fora da origem/aba, expirados ou reutilizados são rejeitados.
 
 A revisão apresenta sempre texto original; máscaras e escolhas são estado separado. A composição das saídas anonimiza os segmentos selecionados, conservando o mesmo contrato PDF/TXT/relatório.
+
+## Contexto automático por documento
+
+Não existe seletor de finalidade nem parâmetro `policy`. O motor partilhado `submission/main.py` infere o contexto de cada documento na primeira passagem Gemini e avalia a utilidade de cada facto na respetiva linha. A decisão não depende do nome do ficheiro nem de um modo exclusivo para medicina: informação substantiva clínica, financeira, educativa ou de outros assuntos pode permanecer, enquanto identificadores pessoais são protegidos. Factos pessoais periféricos continuam sujeitos a ocultação e revisão.
+
+A resposta da sessão inclui `context`: `tema` (enumeração) e `preservar` (decisões com `linha` 1-based e `tipos` não identificadores). Só decisões validadas por linha podem conservar deteções locais. Nomes, documentos e contactos não são tipos conserváveis. A segunda passagem recebe o contexto validado, sem valores pessoais nem explicações livres, e não amplia as permissões de conservação. Todas as deteções locais são protegidas antes das duas chamadas; a conservação aplica-se apenas no resultado local. As escolhas manuais prevalecem no PDF, TXT e relatório. O relatório regista o tema inferido. Sem contexto disponível, não se libertam deteções com base na finalidade.
+
+A classificação automática pode falhar: a revisão permite conservar ou ocultar qualquer fragmento. O script alternativo `submission/anonymize.py` tem um fluxo independente.
+
+Uma correspondência textual inválida permite uma única tentativa de correção por passagem, sobre o mesmo texto protegido. A resposta rejeitada não é reenviada. Se a correção também falhar, nenhum resultado parcial é publicado.

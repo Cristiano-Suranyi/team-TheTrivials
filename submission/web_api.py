@@ -204,7 +204,7 @@ class SessionService:
                     doc, self.analyzer, engine.carregar_chave(), self.model, Path(folder) / 'cache.json',
                     on_progress=lambda stage, progress: self.update(sid, stage=stage, progress=progress),
                 )
-            self.update(sid, doc=doc, lines=tokenize(doc), stats=result['stats'],
+            self.update(sid, doc=doc, lines=tokenize(doc), stats=result['stats'], context=result['context'],
                         status='ready', stage='Ready for your review', progress=100)
         except Exception as error:
             # Never include third-party exceptions, document text or credentials in HTTP responses/logs.
@@ -213,7 +213,7 @@ class SessionService:
             if isinstance(error, ValueError) and str(error).startswith(('Gemini:', 'Resposta Gemini inválida:', 'Não foi possível contactar o Gemini')):
                 message = str(error)
             if isinstance(error, ValueError) and 'fragmentos ausentes' in str(error):
-                message = 'Gemini returned text that is absent from the document. Please try again.'
+                message = 'Gemini returned text or locations that could not be matched safely after a correction attempt. Please try again.'
             with self.lock:
                 if sid in self.sessions:
                     self.sessions[sid].update(status='failed', stage='Processing failed', error=message)
@@ -243,6 +243,7 @@ class SessionService:
                 offset += 1
             report = engine.build_report(doc, selected, [], self.model)
             stats = session['stats']
+            report += f"\n- Contexto automático: {session['context']['tema']}\n"
             report += (f"\n## Pipeline\n- Presidio: {stats['presidio']} fragmentos protegidos antes do Gemini.\n"
                        f"- Gemini: {stats['gemini']} deteções adicionais.\n"
                        '- O relatório reflete as seleções atuais da revisão.\n')

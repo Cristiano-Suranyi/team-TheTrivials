@@ -76,6 +76,32 @@ class WebTests(unittest.TestCase):
         self.assertIn('**1**', result['report'])
         self.assertEqual(self.client.get(f'/api/public/sessions/{sid}/masked').text, 'Nome: * *\nDiagnóstico: *\n')
 
+    def test_automatic_context_preserves_useful_facts_and_allows_manual_masking(self):
+        self.api.stop()
+        context = {'tema': 'saude', 'preservar': [{'linha': 2, 'tipos': ['DIAGNOSTICO']}]}
+        # Audit must not redetect values already protected by the first call.
+        with patch.object(engine, 'chamar_gemini', side_effect=[
+                {'contexto': context, 'entidades': [{'texto': 'diabetes', 'categoria': 'SAUDE', 'tipo': 'DIAGNOSTICO'}]},
+                {'contexto': context, 'entidades': []}]):
+            sid = self.create()
+            self.ready(sid)
+        session = self.ready(sid)
+        self.assertEqual(session['context']['tema'], 'saude')
+        self.assertEqual(session['stats']['total'], 1)
+        result = self.client.get(f'/api/public/sessions/{sid}/masked')
+        self.assertEqual(result.text, 'Nome: * *\nDiagnóstico: diabetes\n')
+        lines = [[{'text': 'Nome: ', 'masked': False}, {'text': 'Ana Correia', 'masked': True}],
+                 [{'text': 'Diagnóstico: ', 'masked': False}, {'text': 'diabetes', 'masked': True}]]
+        response = self.client.post(f'/api/public/sessions/{sid}/render', json={'lines': lines}).json()
+        self.assertEqual(response['text'], 'Nome: * *\nDiagnóstico: *\n')
+        self.assertIn('Contexto automático: saude', response['report'])
+        self.assertNotIn('Ana Correia', response['report'])
+
+    def test_manual_purpose_is_not_an_api_option(self):
+        response = self.client.post('/api/public/sessions', json={'file_name': 'test.pdf', 'lines': ['a'], 'policy': 'anything'})
+        self.assertEqual(response.status_code, 422)
+        self.assertFalse(self.calls)
+
     def test_rejects_modified_text(self):
         sid = self.create()
         self.ready(sid)

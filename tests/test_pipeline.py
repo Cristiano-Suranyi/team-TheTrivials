@@ -202,6 +202,59 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn("Ana",result)
 
 
+    def test_refinamento_conserva_rotulos_ligacoes_e_administracao(self):
+        text = "Referência: 123456789\nData: 15 de abril de 2025\nDiagnóstico: diabetes\nA paciente relatou dificuldade em dormir.\nTratamento: tratamento com metformina\n"
+        values = [("123456789", "PT_NIF", "IDENTIFICACAO"), ("15 de abril de 2025", "DATA", "IDENTIFICACAO"),
+                  ("Diagnóstico: diabetes", "DIAGNOSTICO", "SAUDE"), ("dificuldade em", "CLINICO", "SAUDE"),
+                  ("tratamento com metformina", "PRESCRICAO", "SAUDE")]
+        doc = app.Document(text, [app.Entity(text.index(v), text.index(v)+len(v), c, "llm", subtype=t) for v,t,c in values])
+        result = app.apply_mask(text, app.refine_field_categories(doc))
+        self.assertEqual(result, "Referência: 123456789\nData: 15 de abril de 2025\nDiagnóstico: *\nA paciente relatou dificuldade em dormir.\nTratamento: tratamento com *\n")
+
+    def test_crm_preserva_rotulo_e_protege_identificador_completo(self):
+        import re
+        text = "CRM: 12345-PT\nReferência: 12345-PT\n"
+        pattern = next(p for kind, _, p, _ in app._PATTERNS if kind == "PROFESSIONAL_ID")
+        matches = list(re.finditer(pattern, text))
+        self.assertEqual(len(matches), 1)
+        doc = app.Document(text, [app.Entity(m.start(), m.end(), "IDENTIFICACAO", "presidio", subtype="PROFESSIONAL_ID") for m in matches])
+        result = app.apply_mask(text, app.refine_field_categories(doc))
+        self.assertEqual(result, "CRM: *\nReferência: 12345-PT\n")
+
+    def test_dois_pontos_nao_tornam_diagnostico_num_rotulo(self):
+        text = "HIV positivo: confirmado no exame da paciente.\n"
+        doc = app.Document(text, [app.Entity(0,12,"SAUDE","llm",subtype="DIAGNOSTICO")])
+        self.assertEqual(app.apply_mask(text, app.refine_field_categories(doc)), "* *: confirmado no exame da paciente.\n")
+
+    def test_generico_com_pacientes_nao_e_facto_pessoal(self):
+        text = "Orientações gerais\nA diabetes pode afetar pacientes de qualquer idade.\nHistórico Médico\nDiagnóstico da paciente: diabetes\n"
+        first, last = text.index("diabetes"), text.rindex("diabetes")
+        doc = app.Document(text, [app.Entity(i, i+8, "SAUDE", "llm", subtype="DIAGNOSTICO") for i in (first,last)])
+        result = app.apply_mask(text, app.filter_general_context(doc))
+        self.assertIn("A diabetes pode afetar pacientes", result)
+        self.assertIn("Diagnóstico da paciente: *", result)
+
+    def test_instituicao_na_narrativa_e_nome_do_paciente(self):
+        text = "Consulta no Centro Médico Lisboa. Nome: Ana Correia\n"
+        values = ["Centro Médico Lisboa", "Ana Correia"]
+        doc = app.Document(text, [app.Entity(text.index(v),text.index(v)+len(v),"IDENTIFICACAO","presidio",subtype="PERSON") for v in values])
+        result = app.apply_mask(text, app.refine_field_categories(doc))
+        self.assertEqual(result, "Consulta no Centro Médico Lisboa. Nome: * *\n")
+
+    def test_identificadores_fortes_nao_sao_libertados_em_contexto_geral(self):
+        text = "Informação geral: cartão 4111 2222 3333 4444\nNome: Ana Correia\n"
+        values = [("4111 2222 3333 4444", "CREDIT_CARD", "FINANCEIRO"), ("Ana Correia", "PERSON", "IDENTIFICACAO")]
+        doc = app.Document(text,[app.Entity(text.index(v),text.index(v)+len(v),c,"presidio",subtype=t) for v,t,c in values])
+        result = app.apply_mask(text, app.filter_general_context(doc))
+        self.assertNotIn("4111", result)
+        self.assertNotIn("Ana Correia", result)
+
+    def test_fragmento_amplo_nao_remove_cabecalho_e_dose_continua_oculta(self):
+        text = "Histórico Médico:\nPrescrição: metformina 850mg 2x/dia\n"
+        doc = app.Document(text,[app.Entity(0,len(text)-1,"SAUDE","llm",subtype="PRESCRICAO")])
+        result = app.apply_mask(text, app.refine_field_categories(doc))
+        self.assertEqual(result,"Histórico Médico:\nPrescrição: * * *\n")
+
 
 if __name__ == "__main__":
     unittest.main()

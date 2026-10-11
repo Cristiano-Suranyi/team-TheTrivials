@@ -54,3 +54,17 @@ A deteção decide por fragmento e contexto em todas as categorias: informação
 ## Extensão Chrome
 
 A pasta `extension/` contém a extensão integrada, com ícones e estilo fornecidos. Consulta `extension/README.md` para carregar no Chrome 127+, fixar o ícone e autorizar PDFs locais. Abrir um PDF e clicar em «Abrir no Hidden» entrega-o ao site sem nova seleção e aguarda a confirmação das categorias. A transferência permanece no navegador; o popup não inicia análise. O aviso automático pode ser desligado e o histórico conserva apenas metadados das últimas dez revisões.
+
+## Redução de falsos positivos
+
+Depois das duas passagens protegidas do Gemini, a validação local restringe as sugestões aos valores: conserva rótulos, referências administrativas, datas do relatório, instituições e expressões de ligação. Informação educativa geral não é classificada como pessoal apenas por mencionar pacientes. Nomes e identificadores concretos continuam protegidos antes de qualquer chamada. O CRM tem um padrão contextual próprio, distinto de referências administrativas. As sugestões continuam editáveis na revisão; os testes cobrem pares de contexto geral/pessoal e verificam que a redução de máscaras não liberta identificadores; doses e outros factos úteis dependem do contexto. Estes filtros melhoram os casos verificados, sem garantir deteção perfeita em todos os documentos.
+
+## Contexto automático por documento
+
+Não existe seletor de finalidade nem parâmetro `policy`. O motor partilhado `submission/main.py` infere o contexto de cada documento na primeira passagem Gemini e avalia a utilidade de cada facto na respetiva linha. A decisão não depende do nome do ficheiro nem de um modo exclusivo para medicina: informação substantiva clínica, financeira, educativa ou de outros assuntos pode permanecer, enquanto identificadores pessoais são protegidos. Factos pessoais periféricos continuam sujeitos a ocultação e revisão.
+
+A resposta da sessão inclui `context`: `tema` (enumeração) e `preservar` (decisões com `linha` 1-based e `tipos` não identificadores). Só decisões validadas por linha podem conservar deteções locais. Nomes, documentos e contactos não são tipos conserváveis. A segunda passagem recebe o contexto validado, sem valores pessoais nem explicações livres, e não amplia as permissões de conservação. Todas as deteções locais são protegidas antes das duas chamadas; a conservação aplica-se apenas no resultado local. As escolhas manuais prevalecem no PDF, TXT e relatório. O relatório regista o tema inferido. Sem contexto disponível, não se libertam deteções com base na finalidade.
+
+A classificação automática pode falhar: a revisão permite conservar ou ocultar qualquer fragmento. O script alternativo `submission/anonymize.py` tem um fluxo independente.
+
+Uma correspondência textual inválida permite uma única tentativa de correção por passagem, sobre o mesmo texto protegido. A resposta rejeitada não é reenviada. Se a correção também falhar, nenhum resultado parcial é publicado.

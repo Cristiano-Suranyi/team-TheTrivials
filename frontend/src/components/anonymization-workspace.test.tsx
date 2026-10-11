@@ -102,3 +102,27 @@ it("loads extension PDF at confirmation without starting detection", async () =>
   expect(create).not.toHaveBeenCalled();
   expect(window.location.hash).toBe("");
 });
+
+it("assesses context automatically without a purpose selector or early processing", async () => {
+  vi.spyOn(client, "extractPdfLines").mockResolvedValue(["Nome: Ana", "Diagnóstico: diabetes"]);
+  vi.spyOn(client, "pdfFingerprint").mockResolvedValue("a".repeat(64));
+  const create = vi.spyOn(client, "createSession").mockResolvedValue(session);
+  const {container} = render(<AnonymizationWorkspace />);
+  fireEvent.change(container.querySelector('input[type="file"]')!, {target:{files:[new File(["%PDF-"],"clinical.pdf",{type:"application/pdf"})]}});
+  expect(screen.queryByLabelText("Document purpose")).not.toBeInTheDocument();
+  expect(create).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button",{name:"Anonymize document"}));
+  await waitFor(() => expect(create).toHaveBeenCalled());
+  expect(create.mock.calls[0]).toHaveLength(5);
+});
+
+it("reopens clinical review with medical text visible and identity selected", () => {
+  const {container} = render(<AnonymizationWorkspace initialSession={{...session, context:{tema:"saude",preservar:[]}, lines:[
+    [{id:1,text:"Nome: "},{id:2,text:"Ana",category:"Name"}],
+    [{id:3,text:"Diagnóstico: diabetes. Prescrição: Losartana 50mg 1x/dia"}],
+  ]}} />);
+  expect(screen.queryByLabelText("Document purpose")).not.toBeInTheDocument();
+  expect(container.querySelector('[data-token-id="3"]')?.textContent).toContain("Losartana 50mg 1x/dia");
+  expect(container.querySelector('[data-token-id="3"]')?.getAttribute("aria-pressed")).toBeNull();
+  expect(container.querySelector('[data-token-id="2"]')?.getAttribute("aria-pressed")).toBe("true");
+});

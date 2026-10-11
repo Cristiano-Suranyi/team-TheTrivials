@@ -656,6 +656,11 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
               </p>
             )}
 
+            <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+              Each document’s context is assessed automatically. Relevant content is preserved;
+              personal identifiers are highlighted for review before download.
+            </p>
+
             <div className="mt-4 rounded-lg border border-border bg-card">
               <button
                 type="button"
@@ -813,7 +818,7 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
               </div>
             </section>
 
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">Os fragmentos destacados serão ocultados no download · PDF com nova paginação</span>
             </div>
             <section className="grid gap-6 md:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_320px]">
