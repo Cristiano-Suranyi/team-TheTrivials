@@ -9,8 +9,29 @@ import os
 import shutil
 import subprocess
 import sys
+import socket
+import json
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
+
+
+def existing_service(port):
+    """Return True for Hidden, False for a free port; reject unrelated listeners."""
+    try:
+        with socket.create_connection(('127.0.0.1', port), timeout=1):
+            pass
+    except OSError:
+        return False
+    try:
+        request = Request(f'http://127.0.0.1:{port}/api/health')
+        with urlopen(request, timeout=2) as response:
+            health = json.loads(response.read(8192))
+        if isinstance(health, dict) and health.get('service') == 'hidden' and health.get('status') == 'ok':
+            return True
+    except (OSError, ValueError):
+        pass
+    raise SystemExit(f'Port {port} is used by another service. Stop it yourself or run: python run_app.py --port {port + 1}')
 
 
 def run():
@@ -19,6 +40,13 @@ def run():
     parser.add_argument('--build', action='store_true', help='Rebuild the frontend before starting')
     parser.add_argument('--setup', action='store_true', help='Install/update dependencies, build and exit')
     args = parser.parse_args()
+    if not 1 <= args.port <= 65535:
+        parser.error('--port must be between 1 and 65535')
+    if not args.setup and existing_service(args.port):
+        print(f'Hidden is already running at http://127.0.0.1:{args.port}', flush=True)
+        if args.build:
+            print('Stop the existing server before running --build.')
+        return 0
     if sys.version_info < (3, 9):
         raise SystemExit('Python 3.9 or newer is required.')
     python = ROOT / 'submission' / 'venv' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')

@@ -32,9 +32,9 @@ import { importExtensionPdf, rememberExtensionReview } from "@/lib/anonymize/ext
 
 type Phase = "upload" | "confirm" | "processing" | "review";
 type Token = ApiToken & { masked?: boolean };
-const processingSteps = ["Read PDF", "Presidio", "Gemini", "Review"];
+const processingSteps = ["Read PDF", "Gemini", "Review"];
 const stageLabels: Record<string, string> = {
-  "Detecting common personal data locally": "Presidio · detecting names, contacts and identifiers",
+  "Detecting common personal data locally": "Preparing the document for analysis",
   "Analyzing protected text with Gemini": "Gemini · finding sensitive data in context",
   "Validating and combining detections": "Validating detections and preserving document lines",
   "Checking remaining sensitive data with Gemini": "Gemini · checking for remaining sensitive information",
@@ -214,7 +214,7 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
         setStatusText(files.length > 1 ? `Finding personal data in ${f.name}` : "Finding personal data");
         setProgress(base + share * 0.4);
         const session = await createSession(f.name, pdfLines, settings.categories, (current) => {
-          setActiveStep(current.progress < 30 ? 0 : current.progress < 60 ? 1 : current.progress < 95 ? 2 : 3);
+          setActiveStep(current.progress < 60 ? 0 : current.progress < 95 ? 1 : 2);
           setProgress(base + share * (0.1 + current.progress * 0.009));
           setStatusText(stageLabels[current.stage] ?? current.stage);
         }, fingerprint);
@@ -744,7 +744,7 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
               <h1 className="mt-2 text-3xl font-semibold">Preparing your review</h1>
               <p className="mt-3 text-sm text-muted-foreground">{statusText || "Starting"}</p>
               <Progress value={progress} className="mx-auto mt-9 h-1.5 max-w-sm bg-secondary" />
-              <div className="mt-8 grid grid-cols-4 gap-2">
+              <div className="mt-8 grid grid-cols-3 gap-2">
                 {processingSteps.map((step, index) => (
                   <div key={step} className="flex flex-col items-center gap-2">
                     <span

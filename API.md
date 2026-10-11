@@ -40,7 +40,7 @@ Manual splits are accepted only if concatenated text matches the original lines 
 
 `DELETE /api/public/sessions/{id}`: removes session, returns 204. An in-flight Gemini call cannot be recalled, but its result is discarded.
 
-`GET /api/health`: `{status, gemini_configured, model}`. Checks key presence, not validity/quota.
+`GET /api/health`: `{service: "hidden", status, gemini_configured, model}`. Checks key presence, not validity/quota.
 
 ## Errors and privacy
 
@@ -73,3 +73,8 @@ A resposta da sessão inclui `context`: `tema` (enumeração) e `preservar` (dec
 A classificação automática pode falhar: a revisão permite conservar ou ocultar qualquer fragmento. O script alternativo `submission/anonymize.py` tem um fluxo independente.
 
 Uma correspondência textual inválida permite uma única tentativa de correção por passagem, sobre o mesmo texto protegido. A resposta rejeitada não é reenviada. Se a correção também falhar, nenhum resultado parcial é publicado.
+
+
+## Entrega TXT do modelo
+
+Depois das duas passagens de deteção, uma chamada adicional gera o texto de entrega com o `prompt_template.txt` existente. Reutiliza a cópia protegida pelo Presidio da primeira passagem, sem reenviar identificadores protegidos. A geração é validada antes de publicar a sessão: respostas que alteram linhas, palavras ou conteúdo fora das máscaras são repetidas até três vezes com o mesmo prompt. A resposta aceite é guardada sem alterações em `submission/submission.txt`, e o prompt exato em `submission/prompt.txt`. A última análise concluída substitui os dois ficheiros; falhas ou cancelamento conservam a entrega anterior. As categorias selecionadas e as alterações manuais afetam o PDF/TXT de exportação, não a resposta independente do modelo para o hackathon.

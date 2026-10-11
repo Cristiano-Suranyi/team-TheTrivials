@@ -30,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from submission import main as engine
+from submission import anonymize as submission_delivery
 from submission.pdf_export import redact_pdf, render_review_text
 
 Category = Literal['Name', 'Contact', 'Identifier', 'Date', 'Address', 'Health', 'Financial', 'Sensitive']
@@ -204,8 +205,17 @@ class SessionService:
                     doc, self.analyzer, engine.carregar_chave(), self.model, Path(folder) / 'cache.json',
                     on_progress=lambda stage, progress: self.update(sid, stage=stage, progress=progress),
                 )
-            self.update(sid, doc=doc, lines=tokenize(doc), stats=result['stats'], context=result['context'],
-                        status='ready', stage='Ready for your review', progress=100)
+            self.update(sid, stage='Generating the submission text', progress=97)
+            texto, prompt = submission_delivery.gerar_entrega(
+                doc.text, self.analyzer, engine.carregar_chave(), self.model,
+                texto_protegido=result['texto_protegido'])
+            lines = tokenize(doc)
+            with self.lock:
+                # Deleting/expiring a session during Gemini must not publish its delivery.
+                self.get(sid)
+                submission_delivery.guardar_entrega(texto, prompt)
+                self.update(sid, doc=doc, lines=lines, stats=result['stats'], context=result['context'],
+                            status='ready', stage='Ready for your review', progress=100)
         except Exception as error:
             # Never include third-party exceptions, document text or credentials in HTTP responses/logs.
             message = ('The document could not be processed. Check the Gemini key/quota and try again. '
@@ -313,7 +323,7 @@ def create_app(service=None):
             configured = bool(engine.carregar_chave())
         except ValueError:
             configured = False
-        return {'status': 'ok', 'gemini_configured': configured, 'model': service.model}
+        return {'service': 'hidden', 'status': 'ok', 'gemini_configured': configured, 'model': service.model}
 
     @app.post('/api/public/sessions', status_code=202)
     def create(data: SessionInput):

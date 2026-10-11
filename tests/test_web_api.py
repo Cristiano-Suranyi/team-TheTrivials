@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from submission import main as engine
+from submission import anonymize as delivery
 from submission.web_api import create_app, SessionService, tokenize, MAX_BODY
 
 
@@ -35,6 +36,11 @@ class WebTests(unittest.TestCase):
         for p in (self.key, self.analyzer, self.local, self.api):
             p.start()
             self.addCleanup(p.stop)
+        self.delivery = patch.object(delivery, 'gerar_entrega', return_value=('model text', 'exact prompt'))
+        self.save_delivery = patch.object(delivery, 'guardar_entrega')
+        for mock in (self.delivery, self.save_delivery):
+            mock.start()
+            self.addCleanup(mock.stop)
         self.client = TestClient(create_app(self.service))
         self.client.__enter__()
         self.addCleanup(self.client.__exit__, None, None, None)
@@ -54,6 +60,36 @@ class WebTests(unittest.TestCase):
                 return payload
             time.sleep(.01)
         self.fail('Worker did not finish')
+
+    def test_each_document_updates_submission_only_after_success(self):
+        with patch.object(delivery, 'gerar_entrega', side_effect=[('first answer', 'first prompt'),
+                                                               ('second answer', 'second prompt')]) as generate, \
+             patch.object(delivery, 'guardar_entrega') as save:
+            first = self.create()
+            self.assertEqual(self.ready(first)['status'], 'ready')
+            second = self.create(lines=['Nome: Ana Correia', 'Diagnóstico: diabetes', 'Documento diferente'])
+            self.assertEqual(self.ready(second)['status'], 'ready')
+            self.assertEqual(save.call_args_list[0].args, ('first answer', 'first prompt'))
+            self.assertEqual(save.call_args_list[1].args, ('second answer', 'second prompt'))
+            self.assertIn('Documento diferente', generate.call_args_list[1].args[0])
+        with patch.object(delivery, 'gerar_entrega', side_effect=ValueError('invalid response')), \
+             patch.object(delivery, 'guardar_entrega') as save:
+            sid = self.create()
+            self.assertEqual(self.ready(sid)['status'], 'failed')
+            save.assert_not_called()
+
+    def test_cancel_during_submission_cannot_publish_delivery(self):
+        def cancel(*args, **kwargs):
+            with self.service.lock:
+                self.service.sessions.clear()
+            return 'answer', 'prompt'
+        with patch.object(delivery, 'gerar_entrega', side_effect=cancel), \
+             patch.object(delivery, 'guardar_entrega') as save:
+            sid = self.create()
+            # Barrier on the single worker: wait until the cancelled job has finished.
+            self.service.executor.submit(lambda: None).result(timeout=5)
+            save.assert_not_called()
+            self.assertEqual(self.client.get('/api/public/sessions/' + sid).status_code, 404)
 
     def test_full_flow_privacy_and_review_exports(self):
         sid = self.create()

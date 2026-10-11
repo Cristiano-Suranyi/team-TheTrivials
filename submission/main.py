@@ -834,7 +834,7 @@ def process_document(doc: Document, analyzer, api_key: str, model: str, cache_pa
     doc.entities = filter_general_context(doc)
     doc.entities = merge_entities(apply_document_context(doc, context))
     progress("Validating and combining detections", 95)
-    return {"prompt": prompt, "context": context, "unmatched": unmatched,
+    return {"prompt": prompt, "texto_protegido": protected.text, "context": context, "unmatched": unmatched,
             "stats": {"presidio": local_count, "gemini": len(llm) + len(extra), "total": len(doc.entities)}}
 
 

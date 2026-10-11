@@ -240,7 +240,7 @@ def chamar_gemini(prompt: str, api_key: str, model: str,
 
 
 def anonimizar(prompt: str, enviado: str, api_key: str, model: str,
-               tentativas: int) -> dict:
+               tentativas: int, exigir_formatacao: bool = False) -> dict:
     """Chama o Gemini e constrói o texto final validado."""
     for i in range(tentativas):
         temp = TEMPERATURAS[min(i, len(TEMPERATURAS) - 1)]
@@ -254,9 +254,12 @@ def anonimizar(prompt: str, enviado: str, api_key: str, model: str,
         por_entidades, falta = mascarar_entidades(enviado,
                                                   data["entidades"])
         erros = validar(enviado, data["texto_anonimizado"])
+        if erros and exigir_formatacao:
+            log.warning("Resposta com formatação inválida; a entrega anterior será conservada.")
+            continue
         if erros:
-            log.warning("Texto do modelo rejeitado (%d erros); uso a "
-                        "máscara feita a partir das entidades.",
+            log.warning("Texto do modelo com %d divergências; a versão local "
+                        "é apenas diagnóstico. A entrega conserva a resposta do Gemini.",
                         len(erros))
             for erro in erros[:10]:
                 log.warning("  %s", erro)
@@ -270,6 +273,9 @@ def anonimizar(prompt: str, enviado: str, api_key: str, model: str,
                 "nao_encontradas": falta, "erros_texto_modelo": erros,
                 "texto_modelo": data["texto_anonimizado"],
                 "tentativa": i + 1, "temperature": temp}
+    if exigir_formatacao:
+        raise ValueError("Gemini: Não foi possível obter texto anonimizado com a formatação original. "
+                         "A entrega anterior foi conservada; tente novamente.")
     raise ValueError(f"Nenhuma resposta JSON válida em {tentativas} "
                      "tentativas.")
 
@@ -279,6 +285,55 @@ def guardar(path: Path, texto: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="") as handle:
         handle.write(texto)
+
+
+def gerar_entrega(texto: str, analyzer, api_key: str, model: str,
+                  texto_protegido: str | None = None) -> tuple[str, str]:
+    """Generate the model's submission for this input, protecting local detections."""
+    from submission import main as engine
+    if texto_protegido is None:
+        doc = engine.Document(texto)
+        doc.entities = engine.merge_entities([
+            engine.expandir_intervalo(texto, entity)
+            for entity in engine.detect_presidio(doc, analyzer)
+        ])
+        protegido, _ = engine.preparar_para_gemini(doc)
+        texto_protegido = protegido.text
+    prompt = renderizar_prompt(texto_protegido)
+    resposta = anonimizar(prompt, texto_protegido, api_key, model, 3,
+                         exigir_formatacao=True)
+    return resposta["texto_modelo"], prompt
+
+
+def guardar_entrega(texto: str, prompt: str, pasta: Path = BASE) -> None:
+    """Write only a completed model response and the prompt that produced it."""
+    import tempfile
+    temporarios = []
+    anteriores = {}
+    substituidos = []
+    try:
+        for nome, conteudo in (("submission.txt", texto), ("prompt.txt", prompt)):
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="",
+                                             dir=pasta, delete=False) as handle:
+                temporarios.append((Path(handle.name), pasta / nome))
+                handle.write(conteudo)
+        for _, destino in temporarios:
+            anteriores[destino] = destino.read_bytes() if destino.exists() else None
+        for origem, destino in temporarios:
+            os.replace(origem, destino)
+            substituidos.append(destino)
+    except OSError:
+        # Restore the previous pair if the second replacement fails.
+        for destino in substituidos:
+            anterior = anteriores[destino]
+            if anterior is None:
+                destino.unlink(missing_ok=True)
+            else:
+                destino.write_bytes(anterior)
+        raise
+    finally:
+        for origem, _ in temporarios:
+            origem.unlink(missing_ok=True)
 
 
 def parse_args(argv=None):
@@ -314,7 +369,7 @@ def main(argv=None) -> int:
             return 0
         r = anonimizar(prompt, enviado, carregar_chave(), model,
                        args.tentativas)
-        guardar(args.submission, r["texto"])
+        guardar(args.submission, r["texto_modelo"])
         guardar(args.prompt, prompt)
         meta = {k: v for k, v in r.items() if k != "texto"}
         meta["modelo"] = model
@@ -322,7 +377,7 @@ def main(argv=None) -> int:
                 json.dumps(meta, ensure_ascii=False, indent=2))
         log.info("OK: %d entidades (tentativa %d); texto do modelo %s.",
                  len(r["entidades"]), r["tentativa"],
-                 "rejeitado" if r["erros_texto_modelo"] else "válido")
+                 "com divergências estruturais" if r["erros_texto_modelo"] else "válido")
         if r["nao_encontradas"]:
             log.warning("Entidades não encontradas no texto: %s",
                         r["nao_encontradas"])
