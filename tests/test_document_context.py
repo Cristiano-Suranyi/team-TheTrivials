@@ -10,14 +10,20 @@ from submission import main as app
 class DocumentContextTests(unittest.TestCase):
     def test_context_only_accepts_safe_types_and_valid_lines(self):
         self.assertEqual(app.validate_context(None, 3)["preservar"], [])
+        # Unsafe or malformed decisions are dropped (fragment stays masked), never fatal.
         for value in (
             {"tema": "saude", "preservar": [{"linha": 1, "tipos": ["NOME"]}]},
             {"tema": "saude", "preservar": [{"linha": 4, "tipos": ["CLINICO"]}]},
-            {"tema": "arbitrary", "preservar": []},
             {"tema": "saude", "preservar": [{"linha": True, "tipos": ["CLINICO"]}]},
+            {"tema": "saude", "preservar": [{"linha": 2, "tipos": []}]},
+            {"tema": "saude", "preservar": "x"},
+            "not a dict",
         ):
-            with self.assertRaises(ValueError):
-                app.validate_context(value, 3)
+            self.assertEqual(app.validate_context(value, 3)["preservar"], [])
+        self.assertEqual(app.validate_context({"tema": "arbitrary", "preservar": []}, 3)["tema"], "indeterminado")
+        merged = app.validate_context({"tema": "saude", "preservar": [
+            {"linha": 2, "tipos": ["CLINICO", "NOME"]}, {"linha": 2, "tipos": ["SINTOMA"]}]}, 3)
+        self.assertEqual(merged["preservar"], [{"linha": 2, "tipos": ["CLINICO", "SINTOMA"]}])
         value = app.validate_context({"tema": "saude", "preservar": [], "details": "Ana"}, 3)
         self.assertNotIn("details", value)
 

@@ -1,1 +1,47 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="styles.css"></head><body><main class="popup"><header><span class="mark">*</span><h1>Hidden</h1></header><section class="section"><p id="document" class="name">No PDF detected in this tab</p><button id="now" class="btn btn-primary" hidden>Abrir no Hidden</button><p class="hint"><a id="manual" target="_blank" rel="noopener">Choose a PDF in Hidden</a></p><p class="hint">Review the categories in Hidden before detection starts.</p><p id="error" role="alert" class="error"></p><div class="row"><span>Ask when a PDF opens</span><button class="switch" id="auto" role="switch" aria-label="Ask when a PDF opens" aria-checked="true"></button></div></section><section class="section"><strong>Recent reviews</strong><ul id="sessions" class="sessions"></ul></section><details class="section"><summary>Local service</summary><label class="field">Site and API address<input id="service" type="url" spellcheck="false"></label><div class="row"><button class="btn btn-ghost" id="restore">Default</button><button class="btn btn-secondary" id="save">Save</button></div><p class="hint">Start python3 run_app.py. For local PDFs, enable “Allow access to file URLs” in chrome://extensions.</p></details></main><script type="module" src="popup.js"></script></body></html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="styles.css"></head><body><main class="popup">
+<header><span class="mark">*</span><h1>Hidden</h1></header>
+
+<section class="section" id="empty" hidden>
+  <p class="name">No PDF detected in this tab</p>
+  <p class="hint"><a id="manual" target="_blank" rel="noopener">Choose a PDF in Hidden</a></p>
+</section>
+
+<section class="section" id="ask" hidden>
+  <p class="question">Anonymize this document?</p>
+  <p class="name doc"></p>
+  <div class="actions"><button id="no" class="btn btn-ghost">No</button><button id="yes" class="btn btn-primary">Yes</button></div>
+</section>
+
+<section class="section" id="working" hidden>
+  <p class="name doc"></p>
+  <p id="stage" class="hint" role="status">Reading the PDF…</p>
+  <div class="progress"><span id="bar"></span></div>
+  <p class="hint">You can close this window. Hidden will reopen when the document is ready.</p>
+</section>
+
+<section class="section" id="ready" hidden>
+  <p class="question">Your document is ready</p>
+  <p class="name doc"></p>
+  <div class="stack">
+    <button id="download" class="btn btn-primary">Download masked version</button>
+    <button id="review" class="btn btn-secondary">Review changes</button>
+  </div>
+  <p class="hint"><button id="again" class="link">Start again</button></p>
+</section>
+
+<section class="section" id="failed" hidden>
+  <p class="question">Something went wrong</p>
+  <p class="name doc"></p>
+  <p id="error" role="alert" class="error"></p>
+  <div class="actions"><button id="retry" class="btn btn-primary">Try again</button></div>
+</section>
+
+<section class="section"><strong>Recent reviews</strong><ul id="sessions" class="sessions"></ul></section>
+<details class="section"><summary>Settings</summary>
+  <div class="row"><span>Ask when a PDF opens</span><button class="switch" id="auto" role="switch" aria-label="Ask when a PDF opens" aria-checked="true"></button></div>
+  <label class="field">Local service address<input id="service" type="url" spellcheck="false"></label>
+  <div class="row"><button class="btn btn-ghost" id="restore">Default</button><button class="btn btn-secondary" id="save">Save</button></div>
+  <p id="saved" class="hint"></p>
+  <p class="hint">Start python3 run_app.py. For local PDFs, enable “Allow access to file URLs” in chrome://extensions.</p>
+</details>
+</main><script type="module" src="popup.js"></script></body></html>

@@ -3,6 +3,7 @@ export const allCategories = ["Name", "Contact", "Identifier", "Date", "Address"
 export type Category = typeof allCategories[number];
 export type Token = { id: number; text: string; category?: Category; source?: string };
 export type SessionPayload = {
+  has_pdf?: boolean;
   session_id: string;
   file_name: string;
   categories: Category[];

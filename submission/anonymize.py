@@ -38,6 +38,9 @@ CATEGORIAS = [
     "OUTRO_SENSIVEL",
 ]
 TEMPERATURAS = (0.0, 0.2, 0.4)
+# The submission keeps the model its prompt was written for. In the web service
+# this also keeps it off the per-minute quota of the interactive detection.
+DEFAULT_MODEL = "gemini-3.1-flash-lite"
 log = logging.getLogger("anonymize")
 
 sys.path.insert(0, str(BASE))
@@ -357,7 +360,7 @@ def main(argv=None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     for name in ("presidio-analyzer", "httpx", "google_genai"):
         logging.getLogger(name).setLevel(logging.ERROR)
-    from main import DEFAULT_MODEL, carregar_chave, extrair_texto
+    from main import carregar_chave, extrair_texto
     model = args.model or DEFAULT_MODEL
     try:
         texto = extrair_texto(args.pdf)

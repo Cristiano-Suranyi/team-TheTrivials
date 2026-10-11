@@ -126,3 +126,18 @@ it("reopens clinical review with medical text visible and identity selected", ()
   expect(container.querySelector('[data-token-id="3"]')?.getAttribute("aria-pressed")).toBeNull();
   expect(container.querySelector('[data-token-id="2"]')?.getAttribute("aria-pressed")).toBe("true");
 });
+
+it("downloads an extension review without asking for the original PDF again", async () => {
+  const blob = new Blob(["%PDF-"], { type: "application/pdf" });
+  const exportPdf = vi.spyOn(client, "exportPdf").mockResolvedValue(blob);
+  Object.defineProperty(URL, "createObjectURL", { configurable: true, value: () => "blob:test" });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: () => {} });
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  render(<AnonymizationWorkspace initialSession={{ ...session, has_pdf: true }} />);
+  fireEvent.click(screen.getByRole("button", { name: /Download PDF/ }));
+  await waitFor(() => expect(exportPdf).toHaveBeenCalled());
+  expect(exportPdf.mock.calls[0]![0]).toBe("test");
+  expect(exportPdf.mock.calls[0]![1]).toBeUndefined();
+  expect(exportPdf.mock.calls[0]![2][0]).toEqual([{ text: "Nome: ", masked: false }, { text: "Ana", masked: true }]);
+  await waitFor(() => expect(click).toHaveBeenCalled());
+});

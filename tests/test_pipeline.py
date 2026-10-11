@@ -256,5 +256,82 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result,"Histórico Médico:\nPrescrição: * * *\n")
 
 
+class SpeedTests(unittest.TestCase):
+    """Short answers, forgiving location of real fragments and windows for long documents."""
+
+    def detect(self, text, entities, **options):
+        with tempfile.TemporaryDirectory() as folder, patch.object(app, "chamar_gemini", return_value={"entidades": entities}):
+            doc = app.Document(text)
+            found, _ = app.detect_llm(doc, "p", "fake", "fake", Path(folder) / "cache.json", **options)
+            return app.apply_mask(text, found)
+
+    def test_compact_context_is_equivalent_and_limited_to_its_window(self):
+        value = {"tema": "saude", "preservar": [{"tipo": "CLINICO", "linhas": [1, 2, 9, True]}, {"tipo": "NOME", "linhas": [3]}]}
+        self.assertEqual(app.validate_context(value, 3)["preservar"],
+                         [{"linha": 1, "tipos": ["CLINICO"]}, {"linha": 2, "tipos": ["CLINICO"]}])
+        self.assertEqual(app.validate_context(value, 3, (2, 3))["preservar"], [{"linha": 2, "tipos": ["CLINICO"]}])
+
+    def test_category_is_derived_from_the_type(self):
+        self.assertEqual(self.detect("CVV: 123\n", [{"texto": "123", "tipo": "CVV", "linha": 1, "ocorrencia": 0}]), "CVV: *\n")
+        with self.assertRaises(ValueError):
+            self.detect("CVV: 123\n", [{"texto": "123", "linha": 1, "ocorrencia": 0}])
+
+    def test_guess_at_a_protected_value_is_ignored_but_a_visible_miss_is_not(self):
+        guess = [{"texto": "Ana Correia", "tipo": "NOME", "linha": 1, "ocorrencia": 0}]
+        self.assertEqual(self.detect("Nome: * *\nIdade: 40\n", guess), "Nome: * *\nIdade: 40\n")
+        for text in ("Nome: Ana\n", "Nome: * Correia\n", "Nome: * *\nAna Correia e Ana Correia\n"):
+            with self.assertRaises(ValueError):
+                self.detect(text, guess)
+
+    def test_letter_case_and_neighbouring_line_are_recovered(self):
+        text = "Email: ana@example.invalid\nNotas:\nO filho Rui\nTexto\nTexto\nRui\n"
+        entities = [{"texto": "Ana", "tipo": "NOME", "linha": 1, "ocorrencia": 0},
+                    {"texto": "Rui", "tipo": "NOME", "linha": 2, "ocorrencia": 0}]
+        self.assertEqual(self.detect(text, entities), "Email: *\nNotas:\nO filho *\nTexto\nTexto\nRui\n")
+
+    def test_long_document_is_analysed_in_windows(self):
+        lines = [f"Linha {i}" for i in range(1, 2 * app.WINDOW_LINES + 2)]
+        lines[4], lines[-1] = "Nome: Rita", "Nome: Hugo"
+        self.assertEqual([len(app.split_ranges(n)) for n in (1, app.WINDOW_LINES, app.WINDOW_LINES + 1, len(lines))], [1, 1, 2, 3])
+        self.assertEqual(len(app.split_ranges(len(lines), audit=True)), 2)
+        prompts = []
+        def api(prompt, *args, **kwargs):
+            prompts.append(prompt)
+            if "AUDITORIA FINAL" in prompt:
+                self.assertFalse(kwargs["with_context"])
+                return {"entidades": []}
+            # Every window answers for the whole document; each keeps only its own lines, and a
+            # fragment that cannot be located on another window's line is not an error.
+            return {"contexto": {"tema": "outro", "preservar": [{"tipo": "IDADE", "linhas": [5, len(lines)]}]},
+                    "entidades": [{"texto": "Rita", "tipo": "NOME", "linha": 5, "ocorrencia": 0},
+                                  {"texto": "Hugo", "tipo": "NOME", "linha": len(lines), "ocorrencia": 0},
+                                  {"texto": "Inexistente", "tipo": "OUTRO", "linha": 1 if "linhas 1 a" not in prompt else 400, "ocorrencia": 0}]}
+        with tempfile.TemporaryDirectory() as folder, patch.object(app, "detect_presidio", return_value=[]), \
+             patch.object(app, "chamar_gemini", side_effect=api):
+            doc = app.Document("\n".join(lines) + "\n")
+            result = app.process_document(doc, object(), "fake", "fake", Path(folder) / "cache.json")
+        self.assertEqual(len(prompts), 5)
+        self.assertEqual(sum("INTERVALO" in prompt for prompt in prompts), 5)
+        self.assertNotIn("INTERVALO", result["prompt"])
+        self.assertEqual(result["context"], {"tema": "outro", "preservar": [{"linha": 5, "tipos": ["IDADE"]},
+                                                                              {"linha": len(lines), "tipos": ["IDADE"]}]})
+        masked = app.apply_mask(doc.text, doc.entities).splitlines()
+        self.assertEqual([n for n, (a, b) in enumerate(zip(lines, masked), 1) if a != b], [5, len(lines)])
+        # Beyond the full-context size a window shows the first lines and its neighbourhood only.
+        first = next(prompt for prompt in prompts if "linhas 1 a 201." in prompt)
+        last = next(prompt for prompt in prompts if "linhas 403 a 601." in prompt and "AUDITORIA" not in prompt)
+        self.assertNotIn('"linha": 300,', first)
+        self.assertIn('"linha": 1,', last)
+
+    def test_per_minute_quota_waits_but_daily_quota_does_not(self):
+        def error(quota, delay="4s"):
+            details = {"error": {"details": [{"violations": [{"quotaId": quota}]}, {"retryDelay": delay}]}}
+            return type("E", (), {"details": details})()
+        self.assertEqual(app.quota_wait(error("GenerateRequestsPerMinutePerProjectPerModel-FreeTier")), 5.0)
+        self.assertEqual(app.quota_wait(error("GenerateRequestsPerMinutePerProjectPerModel-FreeTier", "500s")), 61.0)
+        self.assertIsNone(app.quota_wait(error("GenerateRequestsPerDayPerProjectPerModel-FreeTier")))
+        self.assertEqual(app.quota_wait(type("E", (), {"details": None})()), 6.0)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -75,3 +75,13 @@ label.field input { display: block; width: 100%; margin-top: 4px; height: 32px; 
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform 0.15s; }
 .switch[aria-checked="true"] { background: var(--success); }
 .switch[aria-checked="true"]::after { transform: translateX(14px); }
+
+/* Popup flow: ask -> working -> ready */
+.question { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+.section .name { font-size: 12px; color: var(--muted); margin: 0 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.stack .btn { width: 100%; }
+.error { color: var(--danger); font-size: 12px; margin: 0 0 10px; }
+.link { background: none; padding: 0; color: var(--primary); font-size: 11px; }
+.section[hidden] { display: none; }

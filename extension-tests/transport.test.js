@@ -27,3 +27,17 @@ test('stopped service is retryable and only checks the website',async()=>{
  await assert.rejects(checkSite('http://127.0.0.1:8787'),/Start python3 run_app.py/);
  assert.equal(url,'http://127.0.0.1:8787/');
 });
+test('upload sends the PDF to the backend and returns the session',async()=>{
+ const {uploadPDF,getSession}=await import('../extension/transport.js');
+ let call;globalThis.fetch=async(url,opts)=>{call={url,opts};return new Response(JSON.stringify({session_id:'a'.repeat(32),status:'queued'}),{status:202});};
+ const session=await uploadPDF('http://127.0.0.1:8787',new Uint8Array([37,80,68,70]),'x.pdf');
+ assert.equal(session.session_id,'a'.repeat(32));
+ assert.equal(call.url,'http://127.0.0.1:8787/api/public/sessions/upload');assert.equal(call.opts.method,'POST');
+ assert.equal(call.opts.body.get('file').name,'x.pdf');
+ globalThis.fetch=async()=>new Response(JSON.stringify({error:'Configure GEMINI_API_KEY'}),{status:503});
+ await assert.rejects(uploadPDF('http://127.0.0.1:8787',new Uint8Array([1]),'x.pdf'),/GEMINI_API_KEY/);
+ globalThis.fetch=async()=>{throw new Error('refused');};
+ await assert.rejects(uploadPDF('http://127.0.0.1:8787',new Uint8Array([1]),'x.pdf'),/run_app.py/);
+ await assert.rejects(getSession('http://127.0.0.1:8787','a'.repeat(32)),e=>e.retry===true);
+ await assert.rejects(getSession('http://127.0.0.1:8787','../etc'),/Invalid session/);
+});

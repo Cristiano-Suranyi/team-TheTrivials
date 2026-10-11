@@ -1,7 +1,6 @@
 export const DEFAULTS = { apiBase: 'http://127.0.0.1:8787', siteBase: 'http://127.0.0.1:8787', autoPrompt: true };
 export const MAX_PDF = 20 * 1024 * 1024;
-export const CHUNK_SIZE = 192 * 1024;
-export const TRANSFER_TTL = 10 * 60 * 1000;
+export const POLL_MS = 500;
 export function localOrigin(value) {
   const url = new URL(String(value).trim());
   if (url.protocol !== 'http:' || !['127.0.0.1','localhost'].includes(url.hostname) || url.username || url.password || url.search || url.hash || !['','/'].includes(url.pathname)) throw new Error('Use a local address such as http://127.0.0.1:8787.');
@@ -25,4 +24,4 @@ export function pdfName(url, disposition = '') {
   return /\.pdf$/i.test(name) ? name : `${name || 'document'}.pdf`;
 }
 export const pdfURL = value => /^(https?:|file:)\/\//i.test(value || '') && /\.pdf(?:[?#]|$)/i.test(value);
-export const ticket = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2,'0')).join('');
+export const SESSION_ID = /^[A-Za-z0-9_-]{24,64}$/;

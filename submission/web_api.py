@@ -1,6 +1,11 @@
-"""Local HTTP API for Hidden. The browser sends text, never PDF binaries.
+"""Local HTTP API for Hidden.
 
-One worker owns Presidio; sessions stay in memory and expire after one hour.
+The website sends extracted text; the Chrome extension uploads the PDF
+itself (POST /api/public/sessions/upload), which stays in memory with
+the session so masked/reviewed PDFs can be produced without re-upload.
+
+One worker owns Presidio; a second one refreshes the submission files, so the
+next document never waits for them. Sessions stay in memory for one hour.
 Start through run_app.py. Keep this service on the loopback interface.
 """
 from __future__ import annotations
@@ -40,6 +45,28 @@ MAX_SESSIONS = 20
 MAX_CHARACTERS = 200_000
 MAX_BODY = 4 * 1024 * 1024
 DIST = Path(__file__).resolve().parents[1] / 'frontend' / 'dist'
+MAX_PDF = 20 * 1024 * 1024
+EXTENSION_ID = os.getenv('HIDDEN_EXTENSION_ID', 'lfnbhbifaakkolphooipdoinpknmacnf')
+EXTENSION_ORIGIN = f'chrome-extension://{EXTENSION_ID}'
+# Routes the extension may call (upload, poll, downloads). Review edits stay same-origin.
+EXTENSION_ROUTES = re.compile(r'^/api/(health|public/sessions/upload|public/sessions/[A-Za-z0-9_-]{24,64}(/masked(\.pdf)?)?)$')
+
+
+def pdf_lines(content: bytes) -> list[str]:
+    """Extract lines exactly as the export check expects (PyMuPDF, sorted)."""
+    import pymupdf
+    try:
+        document = pymupdf.open(stream=content, filetype='pdf')
+    except Exception:
+        raise HTTPException(415, 'The file is not a valid PDF.') from None
+    with document:
+        if document.needs_pass:
+            raise HTTPException(400, 'Password-protected PDFs are not supported.')
+        text = engine.limpar_texto('\n'.join(page.get_text(sort=True) for page in document))
+    lines = text.splitlines()
+    if not lines:
+        raise HTTPException(422, 'No selectable text. Scanned PDFs need OCR first.')
+    return lines
 
 
 class SessionInput(BaseModel):
@@ -144,8 +171,17 @@ class SessionService:
         self.model = model or os.getenv("GEMINI_MODEL", engine.DEFAULT_MODEL)
         self.sessions = {}
         self.lock = threading.RLock()
+        self.delivery_model = model or os.getenv("GEMINI_MODEL", submission_delivery.DEFAULT_MODEL)
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='hidden')
+        self.delivery_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='hidden-delivery')
         self.analyzer = None
+
+    def warm(self):
+        """Load the local detector at startup instead of during the first document."""
+        with suppress(Exception):
+            if self.analyzer is None:
+                self.analyzer = engine.build_analyzer()
+            self.analyzer.analyze(text='Olá', language=engine.LANGUAGE)
 
     def purge(self):
         with self.lock:
@@ -164,7 +200,9 @@ class SessionService:
             return session
 
     def public(self, session):
-        return deepcopy({k: v for k, v in session.items() if k not in ('deadline', 'original', 'doc', 'pdf_sha256')})
+        payload = deepcopy({k: v for k, v in session.items() if k not in ('deadline', 'original', 'doc', 'pdf_sha256', 'pdf')})
+        payload['has_pdf'] = bool(session.get('pdf'))
+        return payload
 
     def update(self, sid, **values):
         with self.lock:
@@ -173,7 +211,7 @@ class SessionService:
                 raise RuntimeError('Session cancelled or expired.')
             session.update(values)
 
-    def create(self, data):
+    def create(self, data, pdf: bytes | None = None):
         try:
             engine.carregar_chave()
         except ValueError:
@@ -187,7 +225,7 @@ class SessionService:
             session = dict(session_id=sid, file_name=data.file_name, categories=list(dict.fromkeys(data.categories)),
                            lines=[], status='queued', stage='Waiting for the document processor', progress=5,
                            expires_at=datetime.fromtimestamp(deadline, timezone.utc).isoformat(),
-                           deadline=deadline, original=data.lines, pdf_sha256=data.pdf_sha256)
+                           deadline=deadline, original=data.lines, pdf_sha256=data.pdf_sha256, pdf=pdf)
             self.sessions[sid] = session
             payload = self.public(session)
             self.executor.submit(self.process, sid)
@@ -205,17 +243,10 @@ class SessionService:
                     doc, self.analyzer, engine.carregar_chave(), self.model, Path(folder) / 'cache.json',
                     on_progress=lambda stage, progress: self.update(sid, stage=stage, progress=progress),
                 )
-            self.update(sid, stage='Generating the submission text', progress=97)
-            texto, prompt = submission_delivery.gerar_entrega(
-                doc.text, self.analyzer, engine.carregar_chave(), self.model,
-                texto_protegido=result['texto_protegido'])
             lines = tokenize(doc)
-            with self.lock:
-                # Deleting/expiring a session during Gemini must not publish its delivery.
-                self.get(sid)
-                submission_delivery.guardar_entrega(texto, prompt)
-                self.update(sid, doc=doc, lines=lines, stats=result['stats'], context=result['context'],
-                            status='ready', stage='Ready for your review', progress=100)
+            # The user's review/download must not wait for, or depend on, the hackathon delivery text.
+            self.update(sid, doc=doc, lines=lines, stats=result['stats'], context=result['context'],
+                        status='ready', stage='Ready for your review', progress=100, delivery='pending')
         except Exception as error:
             # Never include third-party exceptions, document text or credentials in HTTP responses/logs.
             message = ('The document could not be processed. Check the Gemini key/quota and try again. '
@@ -227,6 +258,26 @@ class SessionService:
             with self.lock:
                 if sid in self.sessions:
                     self.sessions[sid].update(status='failed', stage='Processing failed', error=message)
+            return
+        with suppress(RuntimeError):  # The service is shutting down.
+            self.delivery_executor.submit(self.deliver, sid, doc, result)
+
+    def deliver(self, sid, doc, result):
+        """Best effort: refresh submission.txt/prompt.txt from the model; keep the previous pair on failure."""
+        try:
+            texto, prompt = submission_delivery.gerar_entrega(
+                doc.text, self.analyzer, engine.carregar_chave(), self.delivery_model,
+                texto_protegido=result['texto_protegido'])
+            with self.lock:
+                # Deleting/expiring a session during Gemini must not publish its delivery.
+                if sid not in self.sessions:
+                    return
+                submission_delivery.guardar_entrega(texto, prompt)
+                self.sessions[sid]['delivery'] = 'updated'
+        except Exception:
+            with self.lock:
+                if sid in self.sessions:
+                    self.sessions[sid]['delivery'] = 'kept_previous'
 
     def render(self, sid, request):
         with self.lock:
@@ -269,11 +320,13 @@ def create_app(service=None):
                 await asyncio.sleep(30)
                 service.purge()
         cleaner = asyncio.create_task(cleanup())
+        service.executor.submit(service.warm)
         yield
         cleaner.cancel()
         with suppress(asyncio.CancelledError):
             await cleaner
         service.executor.shutdown(wait=True, cancel_futures=True)
+        service.delivery_executor.shutdown(wait=True, cancel_futures=True)
         service.sessions.clear()
 
     app = FastAPI(title='Hidden local API', lifespan=lifespan, docs_url=None, redoc_url=None)
@@ -284,10 +337,12 @@ def create_app(service=None):
     async def boundaries(request: Request, call_next):
         if request.url.path.startswith('/api'):
             origin = request.headers.get('origin')
-            if origin and origin != f'{request.url.scheme}://{request.headers.get("host", "")}':
+            same_origin = origin == f'{request.url.scheme}://{request.headers.get("host", "")}'
+            from_extension = origin == EXTENSION_ORIGIN and EXTENSION_ROUTES.match(request.url.path)
+            if origin and not same_origin and not from_extension:
                 return JSONResponse({'error': 'Use the application on the same local origin.'}, status_code=403)
             if request.method in ('POST', 'PUT', 'PATCH'):
-                pdf_export = request.url.path.endswith('/export/pdf')
+                pdf_export = request.url.path.endswith(('/export/pdf', '/sessions/upload'))
                 media_type = request.headers.get('content-type', '').split(';')[0]
                 expected = 'multipart/form-data' if pdf_export else 'application/json'
                 if media_type != expected:
@@ -302,6 +357,8 @@ def create_app(service=None):
                     chunks.append(chunk)
                 request._body = b''.join(chunks)
         response = await call_next(request)
+        if request.headers.get('origin') == EXTENSION_ORIGIN:
+            response.headers['Access-Control-Allow-Origin'] = EXTENSION_ORIGIN
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Referrer-Policy'] = 'no-referrer'
         response.headers['X-Content-Type-Options'] = 'nosniff'
@@ -329,6 +386,23 @@ def create_app(service=None):
     def create(data: SessionInput):
         return service.create(data)
 
+    @app.post('/api/public/sessions/upload', status_code=202)
+    async def upload(file: UploadFile = File(...)):
+        """Extension flow: receive the PDF, extract text locally, start the pipeline."""
+        content = await file.read(MAX_PDF + 1)
+        await file.close()
+        if len(content) > MAX_PDF:
+            raise HTTPException(413, 'PDF exceeds 20 MB.')
+        if not content.startswith(b'%PDF-'):
+            raise HTTPException(415, 'The file is not a valid PDF.')
+        lines = await asyncio.to_thread(pdf_lines, content)
+        try:
+            data = SessionInput(file_name=file.filename or 'document.pdf', lines=lines,
+                                pdf_sha256=hashlib.sha256(content).hexdigest())
+        except ValueError:
+            raise HTTPException(422, 'Invalid document: use at most 5,000 lines and 200,000 characters.') from None
+        return service.create(data, pdf=content)
+
     @app.get('/api/public/sessions/{sid}')
     def get(sid: str):
         with service.lock:
@@ -345,17 +419,23 @@ def create_app(service=None):
         return service.render(sid, data)
 
     @app.post('/api/public/sessions/{sid}/export/pdf')
-    async def export_pdf(sid: str, file: UploadFile = File(...), review: str = Form(...)):
+    async def export_pdf(sid: str, review: str = Form(...), file: Optional[UploadFile] = File(None)):
         try:
             data = RenderInput.model_validate_json(review)
         except ValueError:
             raise HTTPException(422, 'Invalid review selections.') from None
-        content = await file.read(20 * 1024 * 1024 + 1)
-        await file.close()
-        if len(content) > 20 * 1024 * 1024:
-            raise HTTPException(413, 'PDF exceeds 20 MB.')
+        content = None
+        if file is not None:
+            content = await file.read(MAX_PDF + 1)
+            await file.close()
+            if len(content) > MAX_PDF:
+                raise HTTPException(413, 'PDF exceeds 20 MB.')
         with service.lock:
             session = service.get(sid)
+            if content is None:
+                content = session.get('pdf')
+                if not content:
+                    raise HTTPException(400, 'Select the original PDF to export this review.')
             digest = session.get('pdf_sha256')
             if digest and hashlib.sha256(content).hexdigest() != digest:
                 raise HTTPException(400, 'Select the exact original PDF used for this review.')
@@ -374,6 +454,34 @@ def create_app(service=None):
         engine.guardar_texto(folder / 'relatorio.md', result['report'])
         return Response(pdf, media_type='application/pdf',
                         headers={'Content-Disposition': 'attachment; filename="anonymized.pdf"'})
+
+    def default_segments(session):
+        return [[Segment(text=t['text'], masked=t.get('category') in session['categories']) for t in line]
+                for line in session['lines']]
+
+    @app.get('/api/public/sessions/{sid}/masked.pdf')
+    async def masked_pdf(sid: str):
+        """Extension "Download masked version": initial suggestions, stored PDF."""
+        with service.lock:
+            session = service.get(sid)
+            if session['status'] != 'ready':
+                raise HTTPException(409, 'Wait until processing is complete.')
+            if not session.get('pdf'):
+                raise HTTPException(409, 'This review has no stored PDF. Download it from the review page.')
+            review = RenderInput(lines=default_segments(session))
+            result = service.render(sid, review)
+            content, original, name = session['pdf'], list(session['original']), session['file_name']
+        try:
+            pdf = await asyncio.to_thread(redact_pdf, content, original, review.lines)
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from None
+        safe_name = re.sub(r'[^\w.-]+', '_', Path(name).stem)[:80] or 'document'
+        folder = engine.ROOT / 'output' / f'{safe_name}-{uuid.uuid4().hex}'
+        folder.mkdir(parents=True, exist_ok=False)
+        engine.guardar_texto(folder / 'anonimizado.txt', result['text'])
+        engine.guardar_texto(folder / 'relatorio.md', result['report'])
+        return Response(pdf, media_type='application/pdf',
+                        headers={'Content-Disposition': f'attachment; filename="{safe_name}-anonymized.pdf"'})
 
     @app.get('/api/public/sessions/{sid}/masked')
     def masked(sid: str):

@@ -5,7 +5,6 @@ import {
   ChevronUp,
   Download,
   FileText,
-  LockKeyhole,
   RefreshCw,
   Settings2,
   ShieldCheck,
@@ -65,7 +64,7 @@ const categoryLabels: Record<Category, { label: string; hint: string }> = {
 };
 
 type AnonymizationSettings = { categories: Category[] };
-type QueuedFile = { id: number; name: string; size: string; file?: File; sessionId?: string; stats?: SessionPayload["stats"] };
+type QueuedFile = { id: number; name: string; size: string; file?: File; sessionId?: string; stats?: SessionPayload["stats"]; hasPdf?: boolean };
 type DocState = { maskedIds: Set<number>; manualIds: Set<number>; docLines: Token[][]; activeTokenId: number };
 
 function initialStateFor(docLines: Token[][], categories: Category[]): DocState {
@@ -78,7 +77,7 @@ function initialStateFor(docLines: Token[][], categories: Category[]): DocState 
 
 export function AnonymizationWorkspace({ initialSession }: { initialSession?: SessionPayload } = {}) {
   const sessionFile: QueuedFile | null = initialSession
-    ? { id: 1, name: initialSession.file_name, size: "", sessionId: initialSession.session_id, stats: initialSession.stats }
+    ? { id: 1, name: initialSession.file_name, size: "", sessionId: initialSession.session_id, stats: initialSession.stats, hasPdf: !!initialSession.has_pdf }
     : null;
   const sessionState = initialSession
     ? initialStateFor(initialSession.lines as Token[][], initialSession.categories as Category[])
@@ -439,7 +438,7 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
     const segments = state.docLines.map((line) =>
       line.map((token) => ({ text: token.text, masked: isMasked(state, token) })),
     );
-    if (!original) throw new Error("Select the original PDF to export this review.");
+    if (!original && !file.hasPdf) throw new Error("Select the original PDF to export this review.");
     return exportPdf(file.sessionId, original, segments);
   };
 
@@ -454,7 +453,7 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
 
   const download = async (original?: File) => {
     if (!activeFile) return;
-    if (!original && !activeFile.file) {
+    if (!original && !activeFile.file && !activeFile.hasPdf) {
       pendingPdfRef.current = activeFile;
       setError("Select the exact original PDF. It will be used only by the local service to preserve the page layout.");
       inputRef.current?.click();
@@ -542,12 +541,6 @@ export function AnonymizationWorkspace({ initialSession }: { initialSession?: Se
                 *
               </div>
               <span className="text-base font-semibold">Hidden</span>
-              <span className="hidden h-4 w-px bg-border sm:block" />
-              <span className="hidden text-xs text-muted-foreground sm:block">NOS · JunctionX Lisbon</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs font-medium text-success">
-              <LockKeyhole className="size-3.5" />
-              <span>Temporary local session</span>
             </div>
           </div>
         </header>

@@ -70,9 +70,10 @@ export async function renderSession(id: string, lines: RenderSegment[][]) {
 }
 
 /** Original bytes reach only the local export service, never Gemini. */
-export async function exportPdf(id: string, file: File, lines: RenderSegment[][]) {
+// file is optional when the backend already holds the PDF (Chrome extension flow).
+export async function exportPdf(id: string, file: File | undefined, lines: RenderSegment[][]) {
   const form = new FormData();
-  form.append("file", file);
+  if (file) form.append("file", file);
   form.append("review", JSON.stringify({ lines }));
   const response = await request(`/api/public/sessions/${encodeURIComponent(id)}/export/pdf`, { method: "POST", body: form });
   if (!response.ok) await handle(response);

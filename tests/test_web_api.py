@@ -53,6 +53,11 @@ class WebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 202, response.text)
         return response.json()['session_id']
 
+    def drain(self):
+        # Barrier on both single workers: processing first, then its delivery.
+        self.service.executor.submit(lambda: None).result(timeout=5)
+        self.service.delivery_executor.submit(lambda: None).result(timeout=5)
+
     def ready(self, sid):
         for _ in range(200):
             payload = self.client.get('/api/public/sessions/' + sid).json()
@@ -69,14 +74,18 @@ class WebTests(unittest.TestCase):
             self.assertEqual(self.ready(first)['status'], 'ready')
             second = self.create(lines=['Nome: Ana Correia', 'Diagnóstico: diabetes', 'Documento diferente'])
             self.assertEqual(self.ready(second)['status'], 'ready')
+            self.drain()  # delivery runs after ready
             self.assertEqual(save.call_args_list[0].args, ('first answer', 'first prompt'))
             self.assertEqual(save.call_args_list[1].args, ('second answer', 'second prompt'))
             self.assertIn('Documento diferente', generate.call_args_list[1].args[0])
         with patch.object(delivery, 'gerar_entrega', side_effect=ValueError('invalid response')), \
              patch.object(delivery, 'guardar_entrega') as save:
             sid = self.create()
-            self.assertEqual(self.ready(sid)['status'], 'failed')
+            # A failed delivery never blocks the user's review.
+            self.assertEqual(self.ready(sid)['status'], 'ready')
+            self.drain()
             save.assert_not_called()
+            self.assertEqual(self.client.get('/api/public/sessions/' + sid).json()['delivery'], 'kept_previous')
 
     def test_cancel_during_submission_cannot_publish_delivery(self):
         def cancel(*args, **kwargs):
@@ -86,8 +95,8 @@ class WebTests(unittest.TestCase):
         with patch.object(delivery, 'gerar_entrega', side_effect=cancel), \
              patch.object(delivery, 'guardar_entrega') as save:
             sid = self.create()
-            # Barrier on the single worker: wait until the cancelled job has finished.
-            self.service.executor.submit(lambda: None).result(timeout=5)
+            # Wait until the cancelled job and its delivery have finished.
+            self.drain()
             save.assert_not_called()
             self.assertEqual(self.client.get('/api/public/sessions/' + sid).status_code, 404)
 
@@ -227,6 +236,72 @@ class WebTests(unittest.TestCase):
         self.assertEqual(outputs[0].read_text(), 'Nome: Ana Correia\nDiagnóstico: *\n')
         bad = self.client.post(f'/api/public/sessions/{sid}/export/pdf', data={'review': json.dumps({'lines': lines})}, files={'file': ('wrong.pdf', b'wrong', 'application/pdf')})
         self.assertEqual(bad.status_code, 400)
+
+
+    def sample_pdf(self):
+        import pymupdf
+        pdf = pymupdf.open()
+        pdf.new_page().insert_text((72, 72), "Nome: Ana Correia")
+        pdf.new_page().insert_text((72, 72), "Diagnóstico: diabetes")
+        content = pdf.tobytes()
+        pdf.close()
+        return content
+
+    def test_extension_flow_upload_download_and_review(self):
+        import json
+        import pymupdf
+        from submission.web_api import EXTENSION_ORIGIN
+        ext = {'Origin': EXTENSION_ORIGIN}
+        response = self.client.post('/api/public/sessions/upload', headers=ext,
+                                    files={'file': ('relatorio.pdf', self.sample_pdf(), 'application/pdf')})
+        self.assertEqual(response.status_code, 202, response.text)
+        self.assertEqual(response.headers['access-control-allow-origin'], EXTENSION_ORIGIN)
+        sid = response.json()['session_id']
+        self.assertTrue(response.json()['has_pdf'])
+        self.assertNotIn('pdf', response.json())
+        self.assertEqual(self.client.get('/api/public/sessions/' + sid, headers=ext).json()['status'] in
+                         ('queued', 'processing', 'ready'), True)
+        session = self.ready(sid)
+        self.assertEqual(session['file_name'], 'relatorio.pdf')
+        # 5a: masked PDF straight from the stored original.
+        masked = self.client.get(f'/api/public/sessions/{sid}/masked.pdf', headers=ext)
+        self.assertEqual(masked.status_code, 200, masked.text)
+        self.assertEqual(masked.headers['content-type'], 'application/pdf')
+        with pymupdf.open(stream=masked.content, filetype='pdf') as result:
+            text = ''.join(page.get_text() for page in result)
+        self.assertNotIn('Ana Correia', text)
+        self.assertNotIn('diabetes', text)
+        # 7: review page exports its own choices without re-selecting the PDF.
+        lines = [[{'text': t['text'], 'masked': t.get('category') == 'Health'} for t in line]
+                 for line in session['lines']]
+        final = self.client.post(f'/api/public/sessions/{sid}/export/pdf',
+                                 files={'review': (None, json.dumps({'lines': lines}))})
+        self.assertEqual(final.status_code, 200, final.text)
+        with pymupdf.open(stream=final.content, filetype='pdf') as result:
+            text = ''.join(page.get_text() for page in result)
+        self.assertIn('Ana Correia', text)
+        self.assertNotIn('diabetes', text)
+        # Review edits stay same-origin: the extension cannot render.
+        render = self.client.post(f'/api/public/sessions/{sid}/render', headers=ext, json={'lines': lines})
+        self.assertEqual(render.status_code, 403)
+
+    def test_upload_rejects_non_pdf_and_other_origins(self):
+        bad = self.client.post('/api/public/sessions/upload',
+                               files={'file': ('x.pdf', b'hello', 'application/pdf')})
+        self.assertEqual(bad.status_code, 415)
+        foreign = self.client.post('/api/public/sessions/upload', headers={'Origin': 'chrome-extension://other'},
+                                   files={'file': ('x.pdf', self.sample_pdf(), 'application/pdf')})
+        self.assertEqual(foreign.status_code, 403)
+
+    def test_export_without_stored_pdf_requires_file(self):
+        import json
+        sid = self.create()
+        session = self.ready(sid)
+        lines = [[{'text': t['text'], 'masked': False} for t in line] for line in session['lines']]
+        response = self.client.post(f'/api/public/sessions/{sid}/export/pdf',
+                                    files={'review': (None, json.dumps({'lines': lines}))})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.client.get(f'/api/public/sessions/{sid}/masked.pdf').status_code, 409)
 
 
 if __name__ == '__main__':
